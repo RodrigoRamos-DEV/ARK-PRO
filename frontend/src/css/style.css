@@ -1,0 +1,257 @@
+/* Estilos Globais e Variáveis de Tema */
+:root {
+    --cor-primaria: #6d28d9;
+    --cor-destaque: #8b5cf6;
+    --cor-fundo: #f5f3f7;
+    --cor-card: #ffffff;
+    --cor-texto: #333;
+    --cor-texto-label: #555;
+    --cor-borda: #e5e7eb;
+    --sombra-card: 0 4px 6px -1px rgba(0,0,0,0.1);
+    --cor-sucesso: #16a34a;
+    --cor-erro: #dc2626;
+}
+
+body.dark-mode {
+    --cor-fundo: #111827;
+    --cor-card: #1f2937;
+    --cor-texto: #f9fafb;
+    --cor-texto-label: #d1d5db;
+    --cor-borda: #4b5563;
+    --sombra-card: 0 4px 6px -1px rgba(0,0,0,0.4);
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    background-color: var(--cor-fundo);
+    color: var(--cor-texto);
+    margin: 0;
+    transition: background-color 0.3s, color 0.3s;
+}
+    
+/* Estrutura Login */
+.login-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    padding: 20px;
+    box-sizing: border-box;
+}
+
+.login-card {
+    max-width: 400px;
+    width: 100%;
+    text-align: center;
+}
+
+.input-group {
+    margin-bottom: 20px;
+    text-align: left;
+}
+
+.error-message {
+    color: var(--cor-erro);
+    font-weight: bold;
+    margin-top: 15px;
+    display: block;
+}
+
+/* Layout Principal Pós-Login */
+body {
+    padding-top: 70px;
+}
+
+/* Barra de Navegação */
+.main-navbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 20px;
+    background-color: var(--cor-primaria);
+    padding: 10px 20px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    z-index: 1000;
+    box-sizing: border-box;
+}
+    
+.navbar-left, .navbar-right { flex: 1; display: flex; }
+.navbar-right { justify-content: flex-end; }
+.navbar-center { display: flex; justify-content: center; gap: 15px; }
+
+.navbar-logo {
+    height: 45px;
+    width: auto;
+}
+
+.navbar-center a {
+    background-color: transparent;
+    color: white;
+    border: 2px solid transparent;
+    padding: 8px 16px;
+    border-radius: 6px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-decoration: none;
+    white-space: nowrap;
+}
+
+.navbar-center a:hover, .navbar-center a.active {
+    background-color: rgba(255, 255, 255, 0.2);
+    border-color: rgba(255, 255, 255, 0.7);
+}
+    
+.nav-button {
+    background-color: transparent;
+    color: white;
+    border: 2px solid transparent;
+    padding: 8px 16px;
+    border-radius: 6px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+.nav-button.logout { background-color: rgba(220, 38, 38, 0.7); }
+.nav-button.logout:hover { background-color: var(--cor-erro); }
+
+.mobile-menu-icon {
+    display: none;
+    font-size: 2em;
+}
+
+/* Conteúdo Principal */
+.container {
+    width: 100%;
+    max-width: 1200px;
+    margin: 20px auto;
+    padding: 0 20px;
+    box-sizing: border-box;
+}
+
+.card {
+    background-color: var(--cor-card);
+    border-radius: 12px;
+    box-shadow: var(--sombra-card);
+    padding: 25px;
+    margin-bottom: 25px;
+}
+
+h1, h2 { color: var(--cor-primaria); }
+
+/* Outros componentes */
+.btn {
+    background-color: var(--cor-primaria);
+    color: white;
+    border: none;
+    padding: 10px 15px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 1em;
+    font-weight: bold;
+    width: 100%;
+}
+.btn:hover { background-color: var(--cor-destaque); }
+.btn:disabled { background-color: #9ca3af; cursor: not-allowed; }
+
+input, select {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid var(--cor-borda);
+    border-radius: 6px;
+    box-sizing: border-box;
+    background-color: var(--cor-fundo);
+    color: var(--cor-texto);
+    margin-top: 5px;
+}
+
+.grid-2-col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+}
+
+/* Oculta as setas em campos de input numéricos */
+input[type=number]::-webkit-inner-spin-button, 
+input[type=number]::-webkit-outer-spin-button { 
+    -webkit-appearance: none; 
+    margin: 0; 
+}
+input[type=number] {
+    appearance: textfield;
+    -moz-appearance: textfield;
+}
+
+/* === Estilos do Modal de Lançamento === */
+.transaction-modal-header {
+    display: grid;
+    gap: 10px;
+    font-weight: bold;
+    margin-bottom: 5px;
+    color: var(--cor-texto-label);
+    padding: 0 10px; /* Adiciona um padding para alinhar com os inputs */
+}
+
+/* A MÁGICA DO ALINHAMENTO ESTÁ AQUI */
+.transaction-modal-header > div {
+    text-align: center;
+    font-size: 0.9em;
+}
+
+.transaction-modal-row {
+    display: grid;
+    gap: 10px;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+/* === Media Queries para Responsividade === */
+@media (max-width: 768px) {
+    .navbar-center {
+        display: none;
+    }
+    .mobile-menu-icon {
+        display: block;
+    }
+    .navbar-center.mobile-active {
+        display: flex;
+        flex-direction: column;
+        position: absolute;
+        top: 70px;
+        left: 0;
+        width: 100%;
+        background-color: var(--cor-primaria);
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        padding: 10px 0;
+    }
+    .navbar-center.mobile-active a {
+        text-align: center;
+        padding: 15px 0;
+        width: 100%;
+        border-radius: 0;
+    }
+    .container {
+        padding: 0 10px;
+        margin-top: 10px;
+    }
+    .card {
+        padding: 15px;
+    }
+    .grid-2-col {
+        grid-template-columns: 1fr;
+    }
+    .form-grid {
+        grid-template-columns: 1fr;
+    }
+    .transaction-modal-header, .transaction-modal-row {
+        grid-template-columns: 1fr;
+        text-align: left;
+    }
+    .transaction-modal-header > div {
+        text-align: left;
+    }
+}
