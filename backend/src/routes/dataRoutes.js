@@ -22,7 +22,13 @@ router.put('/transactions/:id', dataController.updateTransaction);
 router.delete('/transactions/:id', dataController.deleteTransaction);
 router.post('/transactions/batch-delete', dataController.batchDeleteTransactions);
 
-// NOVA ROTA PARA O RELATÓRIO
+// Rota para Upload de Anexos
+router.post('/transactions/:transactionId/attach', dataController.addAttachment);
+
+// Rota para Exclusão de Anexos
+router.delete('/attachments/:attachmentId', dataController.deleteAttachment);
+
+// Rota para o Relatório
 router.post('/generate-report', dataController.generateReport);
 
 module.exports = router;

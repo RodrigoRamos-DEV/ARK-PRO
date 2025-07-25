@@ -3,6 +3,29 @@ import axios from 'axios';
 import { toast } from 'react-toastify';
 import ClientModal from './ClientModal';
 import ConfirmModal from './ConfirmModal';
+import { Doughnut } from 'react-chartjs-2';
+
+// Componente para os Cartões de Estatísticas
+const StatCard = ({ title, value, color }) => (
+    <div className="card" style={{ textAlign: 'center', padding: '20px' }}>
+        <h3 style={{ margin: 0, color: 'var(--cor-texto-label)', fontSize: '1em' }}>{title}</h3>
+        <p style={{ fontSize: '2.5em', margin: '10px 0', color: color || 'var(--cor-primaria)', fontWeight: 'bold' }}>{value}</p>
+    </div>
+);
+
+// Função auxiliar para os estilos das etiquetas de status
+const getStatusStyles = (status) => {
+    switch (status) {
+        case 'Vencido':
+            return { backgroundColor: 'var(--cor-erro)', color: 'white' };
+        case 'A Vencer':
+            return { backgroundColor: 'var(--cor-aviso)', color: '#333' };
+        case 'Ativo':
+            return { backgroundColor: 'var(--cor-sucesso)', color: 'white' };
+        default:
+            return { backgroundColor: '#e5e7eb', color: '#333' };
+    }
+};
 
 function AdminPage() {
     const [clients, setClients] = useState([]);
@@ -10,37 +33,43 @@ function AdminPage() {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingClient, setEditingClient] = useState(null);
     const [confirmState, setConfirmState] = useState({ isOpen: false, onConfirm: null, message: '' });
-    const [newToken, setNewToken] = useState(''); // Estado para guardar o novo token
+    const [newToken, setNewToken] = useState('');
+    const [dashboardData, setDashboardData] = useState(null);
 
-    const API_URL = 'http://localhost:3000/api/admin/clients';
+    const API_URL = 'http://localhost:3000/api/admin';
     const token = localStorage.getItem('token');
 
-    const fetchClients = async () => {
+    const fetchData = async () => {
+        setLoading(true);
         try {
-            const response = await axios.get(API_URL, { headers: { 'x-auth-token': token } });
-            setClients(response.data);
+            const [clientsResponse, dashboardResponse] = await Promise.all([
+                axios.get(`${API_URL}/clients`, { headers: { 'x-auth-token': token } }),
+                axios.get(`${API_URL}/dashboard`, { headers: { 'x-auth-token': token } })
+            ]);
+            setClients(clientsResponse.data);
+            setDashboardData(dashboardResponse.data);
         } catch (error) {
-            toast.error("Erro ao carregar clientes.");
+            toast.error("Erro ao carregar dados do painel.");
         } finally {
             setLoading(false);
         }
     };
 
     useEffect(() => {
-        fetchClients();
+        fetchData();
     }, []);
 
     const handleSaveClient = async (formData, clientId) => {
         try {
-            if (clientId) { // Modo Edição
-                await axios.put(`${API_URL}/${clientId}`, formData, { headers: { 'x-auth-token': token } });
+            if (clientId) {
+                await axios.put(`${API_URL}/clients/${clientId}`, formData, { headers: { 'x-auth-token': token } });
                 toast.success("Cliente atualizado com sucesso!");
-            } else { // Modo Criação
-                const response = await axios.post(API_URL, formData, { headers: { 'x-auth-token': token } });
-                toast.success(response.data.msg);
-                setNewToken(response.data.registrationToken); // Guarda o novo token para ser exibido
+            } else {
+                const response = await axios.post(`${API_URL}/clients`, formData, { headers: { 'x-auth-token': token } });
+                toast.success("Cliente criado com sucesso! Token gerado.");
+                setNewToken(response.data.registrationToken);
             }
-            fetchClients();
+            fetchData();
             setIsModalOpen(false);
             setEditingClient(null);
         } catch (error) {
@@ -54,20 +83,38 @@ function AdminPage() {
             message: `Tem certeza que deseja excluir o cliente "${client.company_name}"? Todos os seus dados (usuários, lançamentos, etc.) serão perdidos permanentemente.`,
             onConfirm: async () => {
                 try {
-                    await axios.delete(`${API_URL}/${client.id}`, { headers: { 'x-auth-token': token } });
+                    await axios.delete(`${API_URL}/clients/${client.id}`, { headers: { 'x-auth-token': token } });
                     toast.success("Cliente excluído com sucesso!");
-                    fetchClients();
-                    setConfirmState({ isOpen: false, onConfirm: null, message: '' });
+                    fetchData();
+                    closeConfirmModal();
                 } catch (error) {
                     toast.error("Erro ao excluir cliente.");
-                    setConfirmState({ isOpen: false, onConfirm: null, message: '' });
+                    closeConfirmModal();
+                }
+            }
+        });
+    };
+
+    const handleRenewLicense = (client) => {
+        setConfirmState({
+            isOpen: true,
+            message: `Deseja marcar o pagamento como recebido e renovar a licença de "${client.company_name}" por mais 30 dias?`,
+            onConfirm: async () => {
+                try {
+                    await axios.put(`${API_URL}/clients/${client.id}/renew`, {}, { headers: { 'x-auth-token': token } });
+                    toast.success("Licença renovada com sucesso!");
+                    fetchData();
+                    closeConfirmModal();
+                } catch (error) {
+                    toast.error(error.response?.data?.error || "Erro ao renovar a licença.");
+                    closeConfirmModal();
                 }
             }
         });
     };
     
     const handleOpenModal = (client = null) => {
-        setNewToken(''); // Limpa o token antigo ao abrir o modal
+        setNewToken('');
         setEditingClient(client);
         setIsModalOpen(true);
     };
@@ -76,12 +123,30 @@ function AdminPage() {
         setConfirmState({ isOpen: false, onConfirm: null, message: '' });
     };
 
+    const chartData = {
+        labels: ['Ativos', 'A Vencer', 'Vencidos'],
+        datasets: [{
+            label: 'Clientes por Status',
+            data: [
+                dashboardData?.summary?.ativos || 0,
+                dashboardData?.summary?.a_vencer || 0,
+                dashboardData?.summary?.vencidos || 0
+            ],
+            backgroundColor: [
+                'var(--cor-sucesso)',
+                'var(--cor-aviso)',
+                'var(--cor-erro)'
+            ],
+            borderColor: 'var(--cor-card)',
+            borderWidth: 2,
+        }]
+    };
+
     return (
         <div>
             <ClientModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} onSave={handleSaveClient} clientToEdit={editingClient} />
-            <ConfirmModal isOpen={confirmState.isOpen} onClose={closeConfirmModal} onConfirm={confirmState.onConfirm} title="Confirmar Exclusão">{confirmState.message}</ConfirmModal>
+            <ConfirmModal isOpen={confirmState.isOpen} onClose={closeConfirmModal} onConfirm={confirmState.onConfirm} title="Confirmar Ação">{confirmState.message}</ConfirmModal>
 
-            {/* Modal para exibir o novo token */}
             {newToken && (
                 <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.7)', zIndex: 1001, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
                     <div className="card" style={{width: '90%', maxWidth: '500px', textAlign: 'center'}}>
@@ -98,15 +163,48 @@ function AdminPage() {
                 <h2>Painel do Administrador</h2>
                 <button className="btn" style={{ width: 'auto' }} onClick={() => handleOpenModal()}>+ Novo Cliente</button>
             </div>
+
+            {loading ? <p>A carregar dashboard...</p> : dashboardData && (
+                <>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '20px' }}>
+                        <StatCard title="Total de Clientes" value={dashboardData.summary.total_clients} />
+                        <StatCard title="Ativos" value={dashboardData.summary.ativos} color="var(--cor-sucesso)" />
+                        <StatCard title="A Vencer" value={dashboardData.summary.a_vencer} color="var(--cor-aviso)" />
+                        <StatCard title="Vencidos" value={dashboardData.summary.vencidos} color="var(--cor-erro)" />
+                    </div>
+
+                    <div className="card grid-2-col" style={{marginTop: '20px'}}>
+                        <div>
+                            <h3>Clientes por Status</h3>
+                            <div style={{maxWidth: '300px', margin: 'auto'}}>
+                                <Doughnut data={chartData} options={{responsive: true}} />
+                            </div>
+                        </div>
+                        <div>
+                            <h3>Próximas Renovações (30 dias)</h3>
+                            {dashboardData.upcomingRenewals.length > 0 ? (
+                                <ul style={{listStyle: 'none', padding: 0}}>
+                                    {dashboardData.upcomingRenewals.map(client => (
+                                        <li key={client.id} style={{display: 'flex', justifyContent: 'space-between', padding: '8px', borderBottom: '1px solid var(--cor-borda)'}}>
+                                            <span>{client.company_name}</span>
+                                            <strong>{new Date(client.license_expires_at).toLocaleDateString('pt-BR', {timeZone: 'UTC'})}</strong>
+                                        </li>
+                                    ))}
+                                </ul>
+                            ) : <p>Nenhuma licença a vencer nos próximos 30 dias.</p>}
+                        </div>
+                    </div>
+                </>
+            )}
+
             <div className="card">
                 <h3>Clientes Cadastrados</h3>
-                {loading ? <p>A carregar...</p> : (
+                {loading ? <p>A carregar lista de clientes...</p> : (
                     <div style={{overflowX: 'auto'}}>
-                        <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '600px' }}>
+                        <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '800px' }}>
                             <thead>
                                 <tr style={{ borderBottom: '2px solid var(--cor-primaria)' }}>
-                                    <th style={{ padding: '10px', textAlign: 'left' }}>Empresa</th>
-                                    <th style={{ padding: '10px', textAlign: 'left' }}>Email Principal</th>
+                                    <th style={{ padding: '10px', textAlign: 'left' }}>Empresa (Fantasia)</th>
                                     <th style={{ padding: '10px', textAlign: 'left' }}>Vencimento</th>
                                     <th style={{ padding: '10px', textAlign: 'left' }}>Status</th>
                                     <th style={{ padding: '10px', textAlign: 'center' }}>Ações</th>
@@ -116,10 +214,22 @@ function AdminPage() {
                                 {clients.map(client => (
                                     <tr key={client.id} style={{ borderBottom: '1px solid var(--cor-borda)' }}>
                                         <td style={{ padding: '10px' }}>{client.company_name}</td>
-                                        <td style={{ padding: '10px' }}>{client.email || 'Não registado'}</td>
-                                        <td style={{ padding: '10px' }}>{new Date(client.license_expires_at).toLocaleDateString()}</td>
-                                        <td style={{ padding: '10px' }}>{client.license_status}</td>
+                                        <td style={{ padding: '10px' }}>{client.license_expires_at ? new Date(client.license_expires_at).toLocaleDateString('pt-BR', {timeZone: 'UTC'}) : 'N/A'}</td>
+                                        <td style={{ padding: '10px' }}>
+                                            <span style={{
+                                                padding: '4px 8px',
+                                                borderRadius: '12px',
+                                                fontSize: '0.8em',
+                                                fontWeight: 'bold',
+                                                ...getStatusStyles(client.license_status)
+                                            }}>
+                                                {client.license_status}
+                                            </span>
+                                        </td>
                                         <td style={{ padding: '10px', textAlign: 'center' }}>
+                                            {(client.license_status === 'Vencido' || client.license_status === 'A Vencer') && (
+                                                <button onClick={() => handleRenewLicense(client)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.2em', marginRight: '10px' }} title="Marcar como Pago e Renovar Licença">💰</button>
+                                            )}
                                             <button onClick={() => handleOpenModal(client)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.2em', marginRight: '10px' }} title="Editar">✏️</button>
                                             <button onClick={() => handleDeleteClient(client)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.2em' }} title="Excluir">🗑️</button>
                                         </td>

@@ -1,6 +1,22 @@
 const db = require('../config/db');
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
 
-// --- FUNCIONÁRIOS ---
+const storage = multer.diskStorage({
+    destination: function (req, file, cb) {
+        const uploadDir = 'uploads/';
+        if (!fs.existsSync(uploadDir)){ fs.mkdirSync(uploadDir); }
+        cb(null, uploadDir);
+    },
+    filename: function (req, file, cb) {
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+        cb(null, uniqueSuffix + '-' + file.originalname);
+    }
+});
+
+const upload = multer({ storage: storage });
+
 exports.getEmployees = async (req, res) => {
     try {
         const result = await db.query('SELECT * FROM employees WHERE client_id = $1 ORDER BY name', [req.user.clientId]);
@@ -13,52 +29,31 @@ exports.getEmployees = async (req, res) => {
 
 exports.addEmployee = async (req, res) => {
     const { name } = req.body;
-    if (!name) {
-        return res.status(400).json({ error: 'O nome do funcionário é obrigatório.' });
-    }
+    if (!name) { return res.status(400).json({ error: 'O nome do funcionário é obrigatório.' }); }
     try {
-        const result = await db.query(
-            'INSERT INTO employees (client_id, name) VALUES ($1, $2) RETURNING *',
-            [req.user.clientId, name]
-        );
+        const result = await db.query( 'INSERT INTO employees (client_id, name) VALUES ($1, $2) RETURNING *', [req.user.clientId, name] );
         res.status(201).json(result.rows[0]);
     } catch (err) {
         console.error(err.message);
-        if (err.code === '23505') {
-            return res.status(400).json({ error: 'Já existe um funcionário com este nome.' });
-        }
+        if (err.code === '23505') { return res.status(400).json({ error: 'Já existe um funcionário com este nome.' }); }
         res.status(500).json({ error: 'Erro no servidor' });
     }
 };
 
-// --- ITENS DE CADASTRO (PRODUTOS, COMPRADORES, ETC) ---
 exports.getAllItems = async (req, res) => {
     try {
         const result = await db.query('SELECT id, type, name FROM items WHERE client_id = $1 ORDER BY name', [req.user.clientId]);
-        const items = {
-            produto: [],
-            comprador: [],
-            compra: [],
-            fornecedor: []
-        };
-        result.rows.forEach(item => {
-            if (items[item.type]) { items[item.type].push({ id: item.id, name: item.name }); }
-        });
+        const items = { produto: [], comprador: [], compra: [], fornecedor: [] };
+        result.rows.forEach(item => { if (items[item.type]) { items[item.type].push({ id: item.id, name: item.name }); } });
         res.json(items);
-    } catch (err) {
-        console.error(err.message);
-        res.status(500).json({ error: 'Erro no servidor ao buscar itens.' });
-    }
+    } catch (err) {  console.error(err.message); res.status(500).json({ error: 'Erro no servidor ao buscar itens.' });  }
 };
 
 exports.addItem = async (req, res) => {
     const { type, name } = req.body;
     if (!type || !name) { return res.status(400).json({ error: 'Tipo e nome são obrigatórios.' }); }
     try {
-        const result = await db.query(
-            'INSERT INTO items (client_id, type, name) VALUES ($1, $2, $3) RETURNING id, name, type',
-            [req.user.clientId, type, name]
-        );
+        const result = await db.query('INSERT INTO items (client_id, type, name) VALUES ($1, $2, $3) RETURNING id, name, type', [req.user.clientId, type, name]);
         res.status(201).json(result.rows[0]);
     } catch (err) {
         console.error(err.message);
@@ -71,16 +66,10 @@ exports.updateItem = async (req, res) => {
     const { name } = req.body;
     const { id } = req.params;
     try {
-        const result = await db.query(
-            'UPDATE items SET name = $1 WHERE id = $2 AND client_id = $3 RETURNING id, name, type',
-            [name, id, req.user.clientId]
-        );
+        const result = await db.query('UPDATE items SET name = $1 WHERE id = $2 AND client_id = $3 RETURNING id, name, type', [name, id, req.user.clientId]);
         if (result.rowCount === 0) { return res.status(404).json({ error: 'Item não encontrado.' }); }
         res.json(result.rows[0]);
-    } catch (err) {
-        console.error(err.message);
-        res.status(500).json({ error: 'Erro no servidor ao atualizar item.' });
-    }
+    } catch (err) {  console.error(err.message); res.status(500).json({ error: 'Erro no servidor ao atualizar item.' });  }
 };
 
 exports.deleteItem = async (req, res) => {
@@ -89,17 +78,25 @@ exports.deleteItem = async (req, res) => {
         const result = await db.query('DELETE FROM items WHERE id = $1 AND client_id = $2', [id, req.user.clientId]);
         if (result.rowCount === 0) { return res.status(404).json({ error: 'Item não encontrado.' }); }
         res.json({ msg: 'Item deletado com sucesso.' });
-    } catch (err) {
-        console.error(err.message);
-        res.status(500).json({ error: 'Erro no servidor ao deletar item.' });
-    }
+    } catch (err) {  console.error(err.message); res.status(500).json({ error: 'Erro no servidor ao deletar item.' });  }
 };
 
-// --- TRANSAÇÕES ---
+const validateTransactionItems = async (clientId, type, description, category) => {
+    const descriptionType = type === 'venda' ? 'produto' : 'compra';
+    const categoryType = type === 'venda' ? 'comprador' : 'fornecedor';
+    const descResult = await db.query('SELECT 1 FROM items WHERE client_id = $1 AND type = $2 AND name = $3', [clientId, descriptionType, description]);
+    if (descResult.rowCount === 0) { throw new Error(`O item '${description}' não está cadastrado como um(a) ${descriptionType}.`); }
+    if (category && category.trim() !== '') {
+        const catResult = await db.query('SELECT 1 FROM items WHERE client_id = $1 AND type = $2 AND name = $3', [clientId, categoryType, category]);
+        if (catResult.rowCount === 0) { throw new Error(`O item '${category}' não está cadastrado como um(a) ${categoryType}.`); }
+    }
+    return true;
+};
+
 exports.getTransactions = async (req, res) => {
     const clientId = req.user.clientId;
     const { employeeId, startDate, endDate, status, product, buyer, purchase, supplier } = req.query;
-    let queryText = 'SELECT t.*, e.name as employee_name FROM transactions t JOIN employees e ON t.employee_id = e.id WHERE t.client_id = $1';
+    let queryText = ` SELECT t.*, e.name as employee_name, a.id as attachment_id, a.file_path, a.file_name FROM transactions t JOIN employees e ON t.employee_id = e.id LEFT JOIN attachments a ON t.id = a.transaction_id WHERE t.client_id = $1 `;
     let queryParams = [clientId];
     let paramIndex = 2;
     if (employeeId && employeeId !== 'todos') { queryText += ` AND t.employee_id = $${paramIndex++}`; queryParams.push(employeeId); }
@@ -120,34 +117,13 @@ exports.getTransactions = async (req, res) => {
     }
 };
 
-const validateTransactionItems = async (clientId, type, description, category) => {
-    const descriptionType = type === 'venda' ? 'produto' : 'compra';
-    const categoryType = type === 'venda' ? 'comprador' : 'fornecedor';
-    const descResult = await db.query('SELECT 1 FROM items WHERE client_id = $1 AND type = $2 AND name = $3', [clientId, descriptionType, description]);
-    if (descResult.rowCount === 0) {
-        throw new Error(`O item '${description}' não está cadastrado como um(a) ${descriptionType}.`);
-    }
-    if (category && category.trim() !== '') {
-        const catResult = await db.query('SELECT 1 FROM items WHERE client_id = $1 AND type = $2 AND name = $3', [clientId, categoryType, category]);
-        if (catResult.rowCount === 0) {
-            throw new Error(`O item '${category}' não está cadastrado como um(a) ${categoryType}.`);
-        }
-    }
-    return true;
-};
-
 exports.addTransaction = async (req, res) => {
     const { employee_id, type, transaction_date, description, category, quantity, unit_price, status } = req.body;
-    if (!employee_id || !type || !transaction_date || !description || !quantity || !unit_price || !status) {
-        return res.status(400).json({ error: "Todos os campos são obrigatórios." });
-    }
+    if (!employee_id || !type || !transaction_date || !description || !quantity || !unit_price || !status) { return res.status(400).json({ error: "Todos os campos são obrigatórios." }); }
     const total_price = parseFloat(quantity) * parseFloat(unit_price);
     try {
         await validateTransactionItems(req.user.clientId, type, description, category);
-        const result = await db.query(
-            'INSERT INTO transactions (client_id, employee_id, type, transaction_date, description, category, quantity, unit_price, total_price, status) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *',
-            [req.user.clientId, employee_id, type, transaction_date, description, category, quantity, unit_price, total_price, status]
-        );
+        const result = await db.query( 'INSERT INTO transactions (client_id, employee_id, type, transaction_date, description, category, quantity, unit_price, total_price, status) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *', [req.user.clientId, employee_id, type, transaction_date, description, category, quantity, unit_price, total_price, status] );
         res.status(201).json(result.rows[0]);
     } catch (err) {
         console.error(err.message);
@@ -161,13 +137,8 @@ exports.updateTransaction = async (req, res) => {
     const total_price = parseFloat(quantity) * parseFloat(unit_price);
     try {
         await validateTransactionItems(req.user.clientId, type, description, category);
-        const result = await db.query(
-            'UPDATE transactions SET employee_id = $1, transaction_date = $2, description = $3, category = $4, quantity = $5, unit_price = $6, total_price = $7, status = $8, type = $9 WHERE id = $10 AND client_id = $11 RETURNING *',
-            [employee_id, transaction_date, description, category, quantity, unit_price, total_price, status, type, id, req.user.clientId]
-        );
-        if (result.rowCount === 0) {
-            return res.status(404).json({ error: 'Transação não encontrada.' });
-        }
+        const result = await db.query( 'UPDATE transactions SET employee_id = $1, transaction_date = $2, description = $3, category = $4, quantity = $5, unit_price = $6, total_price = $7, status = $8, type = $9 WHERE id = $10 AND client_id = $11 RETURNING *', [employee_id, transaction_date, description, category, quantity, unit_price, total_price, status, type, id, req.user.clientId] );
+        if (result.rowCount === 0) { return res.status(404).json({ error: 'Transação não encontrada.' }); }
         res.json(result.rows[0]);
     } catch (err) {
         console.error(err.message);
@@ -176,11 +147,10 @@ exports.updateTransaction = async (req, res) => {
 };
 
 exports.deleteTransaction = async (req, res) => {
+    const { id } = req.params;
     try {
-        const result = await db.query('DELETE FROM transactions WHERE id = $1 AND client_id = $2', [req.params.id, req.user.clientId]);
-        if (result.rowCount === 0) {
-            return res.status(404).json({ error: 'Transação não encontrada ou não pertence a este cliente.' });
-        }
+        const result = await db.query('DELETE FROM transactions WHERE id = $1 AND client_id = $2', [id, req.user.clientId]);
+        if (result.rowCount === 0) { return res.status(404).json({ error: 'Transação não encontrada ou não pertence a este cliente.' }); }
         res.json({ msg: 'Transação deletada com sucesso.' });
     } catch (err) {
         console.error(err.message);
@@ -190,15 +160,10 @@ exports.deleteTransaction = async (req, res) => {
 
 exports.batchDeleteTransactions = async (req, res) => {
     const { ids } = req.body;
-    if (!ids || !Array.isArray(ids) || ids.length === 0) {
-        return res.status(400).json({ error: 'Uma lista de IDs é necessária.' });
-    }
+    if (!ids || !Array.isArray(ids) || ids.length === 0) { return res.status(400).json({ error: 'Uma lista de IDs é necessária.' }); }
     const client = await db.query('BEGIN');
     try {
-        await db.query(
-            'DELETE FROM transactions WHERE id = ANY($1) AND client_id = $2',
-            [ids, req.user.clientId]
-        );
+        await db.query( 'DELETE FROM transactions WHERE id = ANY($1) AND client_id = $2', [ids, req.user.clientId] );
         await db.query('COMMIT');
         res.json({ msg: 'Lançamentos selecionados foram deletados com sucesso.' });
     } catch (err) {
@@ -217,58 +182,17 @@ exports.generateReport = async (req, res) => {
         const userTimezoneOffset = date.getTimezoneOffset() * 60000;
         return new Date(date.getTime() + userTimezoneOffset).toLocaleDateString('pt-BR');
     };
-    
     let title = "Relatório de Fechamento";
     let subtitle = "";
-    let tableHeaders = [];
-    let tableRows = "";
-
     const isCompradorEspecifico = viewType === 'vendas' && filters.buyer !== 'todos';
     const isFornecedorEspecifico = viewType === 'gastos' && filters.supplier !== 'todos';
     const isFuncionarioEspecifico = filters.employeeId !== 'todos';
-    
-    const renderRow = (item, columns) => {
-        return `
-            <tr>
-                ${columns.map(col => `<td>${item[col.key] || ''}</td>`).join('')}
-            </tr>
-        `;
-    };
-    
-    // Simplificando a lógica de geração de linhas para evitar repetição
-    const generateTableRows = (data, headers) => {
-        return data.map(item => {
-            let rowHtml = '<tr>';
-            for (const header of headers) {
-                let cellValue = '';
-                switch(header.key) {
-                    case 'transaction_date': cellValue = formatDate(item.transaction_date); break;
-                    case 'employee_name': cellValue = item.employee_name; break;
-                    case 'type': cellValue = `<span style="text-transform: capitalize;">${item.type}</span>`; break;
-                    case 'description': cellValue = item.description; break;
-                    case 'category': cellValue = item.category; break;
-                    case 'total_price': cellValue = `<span style="color:${item.type === 'venda' ? 'green' : 'red'};">${formatCurrency(item.total_price)}</span>`; break;
-                    case 'status': cellValue = item.status; break;
-                    default: cellValue = '';
-                }
-                rowHtml += `<td>${cellValue}</td>`;
-            }
-            rowHtml += '</tr>';
-            return rowHtml;
-        }).join('');
-    };
-
-
     if (isCompradorEspecifico) {
         title = "Relatório de Fechamento - Venda";
         subtitle = `<h1 style="font-size: 2.2em; margin: 10px 0;">${filters.buyer.toUpperCase()}</h1>`;
-        tableHeaders = ['Data', 'Qtd', 'Produto', 'Valor Unit.', 'Valor Total', 'Status'];
-        // A lógica específica para este cenário precisaria de mais dados (qtd, valor unit) que não estão no filteredData atual
-        // Por simplicidade, usaremos a lógica geral por agora.
     } else if (isFornecedorEspecifico) {
         title = "Relatório de Fechamento - Compra";
         subtitle = `<h1 style="font-size: 2.2em; margin: 10px 0;">${filters.supplier.toUpperCase()}</h1>`;
-        tableHeaders = ['Data', 'Qtd', 'Compra', 'Valor Unit.', 'Valor Total', 'Status'];
     } else if (isFuncionarioEspecifico) {
         subtitle = `<h1 style="font-size: 2.2em; margin: 10px 0;">${employeeName.toUpperCase()}</h1>`;
         if (viewType === 'vendas') title = "Relatório de Fechamento - Venda";
@@ -276,13 +200,11 @@ exports.generateReport = async (req, res) => {
     } else {
         title = "Relatório de Fechamento - Geral";
     }
-    
     const includeFuncionario = !isFuncionarioEspecifico;
     const finalTableHeaders = includeFuncionario
         ? ['Data', 'Funcionário', 'Tipo', 'Descrição', 'Comprador/Forn.', 'Total', 'Status']
         : ['Data', 'Tipo', 'Descrição', 'Comprador/Forn.', 'Total', 'Status'];
-        
-    tableRows = filteredData.map(item => `
+    const tableRows = filteredData.map(item => `
         <tr>
             <td>${formatDate(item.transaction_date)}</td>
             ${includeFuncionario ? `<td>${item.employee_name || ''}</td>` : ''}
@@ -293,7 +215,6 @@ exports.generateReport = async (req, res) => {
             <td>${item.status || ''}</td>
         </tr>
     `).join('');
-
     const html = `
         <!DOCTYPE html><html><head><meta charset="UTF-8"><title>Relatório de Fechamento</title><style>body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}table{width:100%;border-collapse:collapse;margin-top:20px;font-size:12px}th,td{border:1px solid #ccc;padding:8px;text-align:left}th{background-color:#f2f2f2}.resumo{margin-top:20px;padding:15px;border:1px solid #ccc;background:#f9f9f9}@media print{.no-print{display:none}}</style></head>
         <body>
@@ -315,4 +236,43 @@ exports.generateReport = async (req, res) => {
         </body></html>
     `;
     res.send(html);
+};
+
+exports.addAttachment = (req, res) => {
+    upload.single('attachment')(req, res, async function (err) {
+        if (err) { console.error("Multer error:", err); return res.status(500).json({ error: "Erro no upload do ficheiro." }); }
+        if (!req.file) { return res.status(400).json({ error: "Nenhum ficheiro enviado." }); }
+        const { transactionId } = req.params;
+        const { originalname, path: filePath, mimetype } = req.file;
+        try {
+            const trxResult = await db.query('SELECT id FROM transactions WHERE id = $1 AND client_id = $2', [transactionId, req.user.clientId]);
+            if (trxResult.rowCount === 0) {
+                fs.unlinkSync(filePath);
+                return res.status(403).json({ error: "Acesso negado a esta transação." });
+            }
+            await db.query('DELETE FROM attachments WHERE transaction_id = $1', [transactionId]);
+            const attachResult = await db.query( 'INSERT INTO attachments (client_id, transaction_id, file_name, file_path, file_type) VALUES ($1, $2, $3, $4, $5) RETURNING id', [req.user.clientId, transactionId, originalname, filePath, mimetype] );
+            res.status(201).json({ msg: 'Anexo adicionado com sucesso!' });
+        } catch (dbErr) {
+            console.error(dbErr.message);
+            fs.unlinkSync(filePath); 
+            res.status(500).json({ error: 'Erro ao guardar a referência do anexo.' });
+        }
+    });
+};
+
+exports.deleteAttachment = async (req, res) => {
+    const { attachmentId } = req.params;
+    const clientId = req.user.clientId;
+    try {
+        const attachResult = await db.query( 'SELECT file_path FROM attachments WHERE id = $1 AND client_id = $2', [attachmentId, clientId] );
+        if (attachResult.rowCount === 0) { return res.status(404).json({ error: "Anexo não encontrado ou não pertence a este cliente." }); }
+        const { file_path } = attachResult.rows[0];
+        await db.query('DELETE FROM attachments WHERE id = $1', [attachmentId]);
+        if (fs.existsSync(file_path)) { fs.unlinkSync(file_path); }
+        res.json({ msg: 'Anexo excluído com sucesso.' });
+    } catch (err) {
+        console.error(err.message);
+        res.status(500).json({ error: 'Erro no servidor ao excluir o anexo.' });
+    }
 };

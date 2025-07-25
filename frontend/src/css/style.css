@@ -10,6 +10,7 @@
     --sombra-card: 0 4px 6px -1px rgba(0,0,0,0.1);
     --cor-sucesso: #16a34a;
     --cor-erro: #dc2626;
+    --cor-aviso: #f59e0b; /* A DEFINIÇÃO CRÍTICA ESTÁ AQUI */
 }
 
 body.dark-mode {
@@ -28,7 +29,7 @@ body {
     margin: 0;
     transition: background-color 0.3s, color 0.3s;
 }
-    
+
 /* Estrutura Login */
 .login-container {
     display: flex;
@@ -80,7 +81,7 @@ body {
 }
     
 .navbar-left, .navbar-right { flex: 1; display: flex; }
-.navbar-right { justify-content: flex-end; }
+.navbar-right { justify-content: flex-end; align-items: center; }
 .navbar-center { display: flex; justify-content: center; gap: 15px; }
 
 .navbar-logo {
@@ -109,8 +110,8 @@ body {
 .nav-button {
     background-color: transparent;
     color: white;
-    border: 2px solid transparent;
-    padding: 8px 16px;
+    border: none;
+    padding: 8px 12px;
     border-radius: 6px;
     font-weight: bold;
     cursor: pointer;
@@ -193,21 +194,59 @@ input[type=number] {
     font-weight: bold;
     margin-bottom: 5px;
     color: var(--cor-texto-label);
-    padding: 0 10px; /* Adiciona um padding para alinhar com os inputs */
 }
-
-/* A MÁGICA DO ALINHAMENTO ESTÁ AQUI */
 .transaction-modal-header > div {
     text-align: center;
     font-size: 0.9em;
 }
-
 .transaction-modal-row {
     display: grid;
     gap: 10px;
     align-items: center;
     margin-bottom: 10px;
 }
+
+/* === Estilos dos Avisos de Vencimento === */
+.expiry-warning {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    background-color: var(--cor-aviso);
+    color: #fff;
+    padding: 15px 20px;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    z-index: 2000;
+    font-weight: bold;
+}
+
+.expiry-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(220, 38, 38, 0.9);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1999;
+}
+
+.expiry-overlay-content {
+    background-color: var(--cor-card);
+    padding: 40px;
+    border-radius: 12px;
+    text-align: center;
+    max-width: 500px;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+}
+
+.expiry-overlay-content h2 {
+    color: var(--cor-erro);
+    margin-top: 0;
+}
+
 
 /* === Media Queries para Responsividade === */
 @media (max-width: 768px) {

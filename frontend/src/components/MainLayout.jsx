@@ -1,9 +1,61 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
+
+// Componente para o aviso de Vencimento Próximo
+const ExpiryWarning = ({ daysLeft }) => (
+    <div className="expiry-warning">
+        {daysLeft > 1 && `A sua licença expira em ${daysLeft} dias.`}
+        {daysLeft === 1 && `A sua licença expira amanhã!`}
+        {daysLeft === 0 && `A sua licença expira hoje!`}
+    </div>
+);
+
+// Componente para o overlay de Licença Expirada
+const ExpiryOverlay = () => (
+    <div className="expiry-overlay">
+        <div className="expiry-overlay-content">
+            <h2>Sistema Vencido</h2>
+            <p>A sua licença de acesso ao sistema expirou. Por favor, entre em contacto com o suporte para regularizar a sua situação e reativar o acesso.</p>
+        </div>
+    </div>
+);
+
 
 function MainLayout({ theme, toggleTheme, isAdmin = false }) {
     const navigate = useNavigate();
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+    
+    // --- NOVO ESTADO PARA CONTROLAR O AVISO DE VENCIMENTO ---
+    const [licenseStatus, setLicenseStatus] = useState({ status: 'active', daysLeft: null });
+
+    useEffect(() => {
+        // Apenas clientes (não admins) têm verificação de licença
+        if (isAdmin) {
+            setLicenseStatus({ status: 'active', daysLeft: null });
+            return;
+        }
+
+        const user = JSON.parse(localStorage.getItem('user'));
+        if (user && user.licenseExpiresAt) {
+            const today = new Date();
+            const expiryDate = new Date(user.licenseExpiresAt);
+            
+            // Zera a hora para comparar apenas as datas
+            today.setHours(0, 0, 0, 0);
+            expiryDate.setHours(0, 0, 0, 0);
+
+            const timeDiff = expiryDate.getTime() - today.getTime();
+            const daysLeft = Math.ceil(timeDiff / (1000 * 3600 * 24));
+            
+            if (daysLeft < 0) {
+                setLicenseStatus({ status: 'expired', daysLeft: null });
+            } else if (daysLeft <= 5) {
+                setLicenseStatus({ status: 'warning', daysLeft: daysLeft });
+            } else {
+                setLicenseStatus({ status: 'active', daysLeft: null });
+            }
+        }
+    }, [isAdmin]);
 
     const handleLogout = () => {
         localStorage.removeItem('token');
@@ -44,9 +96,20 @@ function MainLayout({ theme, toggleTheme, isAdmin = false }) {
                     )}
                 </div>
             </nav>
-            <main className="container">
-                <Outlet />
-            </main>
+
+            {/* Renderização Condicional do Conteúdo */}
+            {licenseStatus.status === 'expired' ? (
+                <ExpiryOverlay />
+            ) : (
+                <>
+                    <main className="container">
+                        <Outlet />
+                    </main>
+                    {licenseStatus.status === 'warning' && (
+                        <ExpiryWarning daysLeft={licenseStatus.daysLeft} />
+                    )}
+                </>
+            )}
         </div>
     );
 }

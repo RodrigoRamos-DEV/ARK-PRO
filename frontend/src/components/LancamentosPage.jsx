@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import axios from 'axios';
+import { toast } from 'react-toastify'; // LINHA ADICIONADA
 import TransactionModal from './TransactionModal';
 import ConfirmModal from './ConfirmModal';
 import Pagination from './Pagination';
 
 const ITEMS_PER_PAGE = 10;
 
-const TransactionTable = ({ title, transactions, onEdit, onDelete, selected, onSelect, onSelectAll }) => (
+const TransactionTable = ({ title, transactions, onEdit, onDelete, onDeleteAttachment, selected, onSelect, onSelectAll }) => (
   <div className="card">
     <h3>{title}</h3>
     {transactions.length > 0 ? (
@@ -31,15 +32,21 @@ const TransactionTable = ({ title, transactions, onEdit, onDelete, selected, onS
             {transactions.map(trx => (
               <tr key={trx.id} style={{ borderBottom: '1px solid var(--cor-borda)' }}>
                 <td style={{ padding: '10px' }}><input type="checkbox" checked={selected.includes(trx.id)} onChange={() => onSelect(trx.id)} /></td>
-                <td style={{ padding: '10px' }}>{new Date(trx.transaction_date).toLocaleDateString()}</td>
+                <td style={{ padding: '10px' }}>{new Date(trx.transaction_date).toLocaleDateString('pt-BR', {timeZone: 'UTC'})}</td>
                 <td style={{ padding: '10px' }}>{trx.employee_name}</td>
                 <td style={{ padding: '10px' }}>{trx.description}</td>
                 <td style={{ padding: '10px' }}>{trx.category}</td>
                 <td style={{ padding: '10px' }}>{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(trx.total_price)}</td>
                 <td style={{ padding: '10px' }}>{trx.status}</td>
                 <td style={{ padding: '10px', textAlign: 'center' }}>
-                  <button onClick={() => onEdit(trx)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.2em', marginRight: '10px' }} title="Editar">✏️</button>
-                  <button onClick={() => onDelete(trx.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.2em' }} title="Excluir">🗑️</button>
+                    {trx.attachment_id && (
+                        <>
+                            <a href={`http://localhost:3000/${trx.file_path.replace(/\\/g, '/')}`} target="_blank" rel="noopener noreferrer" title={trx.file_name} style={{textDecoration: 'none', fontSize: '1.2em', marginRight: '10px'}}>📎</a>
+                            <button onClick={() => onDeleteAttachment(trx.attachment_id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--cor-erro)', fontWeight: 'bold', fontSize: '1.2em', marginRight: '10px' }} title="Excluir Anexo">✖</button>
+                        </>
+                    )}
+                    <button onClick={() => onEdit(trx)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.2em', marginRight: '10px' }} title="Editar">✏️</button>
+                    <button onClick={() => onDelete(trx.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.2em' }} title="Excluir">🗑️</button>
                 </td>
               </tr>
             ))}
@@ -63,7 +70,7 @@ function LancamentosPage() {
     const [selectedTransactions, setSelectedTransactions] = useState([]);
     const [confirmState, setConfirmState] = useState({ isOpen: false, message: '', onConfirm: null });
     const [items, setItems] = useState({ produto: [], comprador: [], compra: [], fornecedor: [] });
-    const [filters, setFilters] = useState({ employeeId: '', startDate: '', endDate: '', status: 'todos' });
+    const [filters, setFilters] = useState({ employeeId: '', startDate: '', endDate: '', status: 'todos', product: 'todos', buyer: 'todos', purchase: 'todos', supplier: 'todos' });
     const [currentPageVendas, setCurrentPageVendas] = useState(1);
     const [currentPageGastos, setCurrentPageGastos] = useState(1);
 
@@ -85,9 +92,9 @@ function LancamentosPage() {
             setError('Não foi possível carregar os dados para os filtros.');
         }
     };
-
+    
     const fetchTransactions = useCallback(async () => {
-        if (!filters.employeeId) return; // Não busca transações se nenhum funcionário foi carregado ainda
+        if (!filters.employeeId) return;
         setSelectedTransactions([]);
         setLoading(true);
         setError('');
@@ -116,7 +123,7 @@ function LancamentosPage() {
             fetchTransactions();
         }
     };
-
+    
     const closeConfirmModal = () => {
         setConfirmState({ isOpen: false, message: '', onConfirm: null });
     };
@@ -139,12 +146,31 @@ function LancamentosPage() {
         });
     };
 
+    const handleDeleteAttachment = (attachmentId) => {
+        setConfirmState({
+            isOpen: true,
+            message: 'Tem certeza que deseja excluir este anexo? Esta ação não pode ser desfeita.',
+            onConfirm: async () => {
+                const token = localStorage.getItem('token');
+                try {
+                    await axios.delete(`http://localhost:3000/api/data/attachments/${attachmentId}`, { headers: { 'x-auth-token': token } });
+                    toast.success("Anexo excluído com sucesso!");
+                    fetchTransactions();
+                    closeConfirmModal();
+                } catch (error) {
+                    toast.error("Erro ao excluir o anexo.");
+                    closeConfirmModal();
+                }
+            }
+        });
+    };
+
     const handleOpenAddModal = (type) => {
         setModalType(type);
         setEditingTransaction(null);
         setIsModalOpen(true);
     };
-
+    
     const handleOpenEditModal = (transaction) => {
         setModalType(transaction.type);
         setEditingTransaction(transaction);
@@ -210,7 +236,8 @@ function LancamentosPage() {
                 allTransactions={transactions}
                 defaultEmployeeId={filters.employeeId !== 'todos' ? filters.employeeId : null}
             />
-            <ConfirmModal isOpen={confirmState.isOpen} onClose={closeConfirmModal} onConfirm={confirmState.onConfirm} title="Confirmar Exclusão">{confirmState.message}</ConfirmModal>
+            <ConfirmModal isOpen={confirmState.isOpen} onClose={closeConfirmModal} onConfirm={confirmState.onConfirm} title="Confirmar Ação">{confirmState.message}</ConfirmModal>
+
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '10px' }}>
                 <h2>Lançamentos</h2>
                 <div style={{display: 'flex', gap: '10px', flexWrap: 'wrap'}}>
@@ -221,6 +248,7 @@ function LancamentosPage() {
                     <button className="btn" onClick={() => handleOpenAddModal('gasto')} style={{ width: 'auto' }}>Novo Gasto</button>
                 </div>
             </div>
+
             <div className="card">
                 <h4>Filtros</h4>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '15px' }}>
@@ -237,14 +265,23 @@ function LancamentosPage() {
                     <div><label htmlFor="buyer">Comprador</label><select id="buyer" name="buyer" value={filters.buyer} onChange={handleFilterChange}><option value="todos">Todos</option>{items.comprador.map(item => <option key={item.id} value={item.name}>{item.name}</option>)}</select></div>
                     <div><label htmlFor="purchase">Compra</label><select id="purchase" name="purchase" value={filters.purchase} onChange={handleFilterChange}><option value="todos">Todas</option>{items.compra.map(item => <option key={item.id} value={item.name}>{item.name}</option>)}</select></div>
                     <div><label htmlFor="supplier">Fornecedor</label><select id="supplier" name="supplier" value={filters.supplier} onChange={handleFilterChange}><option value="todos">Todos</option>{items.fornecedor.map(item => <option key={item.id} value={item.name}>{item.name}</option>)}</select></div>
-                    <div><label htmlFor="status">Status</label><select id="status" name="status" value={filters.status} onChange={handleFilterChange}><option value="todos">Todos</option><option value="Pago">Pago</option><option value="A Pagar">A Pagar</option></select></div>
+                    <div>
+                        <label htmlFor="status">Status</label>
+                        <select id="status" name="status" value={filters.status} onChange={handleFilterChange}>
+                            <option value="todos">Todos</option>
+                            <option value="Pago">Pago</option>
+                            <option value="A Pagar">A Pagar</option>
+                        </select>
+                    </div>
                 </div>
             </div>
-            {loading ? <p>Carregando lançamentos...</p> : 
+            
+            {loading ? <p>A carregar lançamentos...</p> : 
                 <>
-                    <TransactionTable title="Vendas Existentes" transactions={paginatedVendas} onEdit={handleOpenEditModal} onDelete={handleDeleteTransaction} selected={selectedTransactions} onSelect={handleSelectTransaction} onSelectAll={handleSelectAll} />
+                    <TransactionTable title="Vendas Existentes" transactions={paginatedVendas} onEdit={handleOpenEditModal} onDelete={handleDeleteTransaction} onDeleteAttachment={handleDeleteAttachment} selected={selectedTransactions} onSelect={handleSelectTransaction} onSelectAll={handleSelectAll} />
                     <Pagination currentPage={currentPageVendas} totalPages={totalVendasPages} onPageChange={setCurrentPageVendas} />
-                    <TransactionTable title="Gastos Existentes" transactions={paginatedGastos} onEdit={handleOpenEditModal} onDelete={handleDeleteTransaction} selected={selectedTransactions} onSelect={handleSelectTransaction} onSelectAll={handleSelectAll} />
+
+                    <TransactionTable title="Gastos Existentes" transactions={paginatedGastos} onEdit={handleOpenEditModal} onDelete={handleDeleteTransaction} onDeleteAttachment={handleDeleteAttachment} selected={selectedTransactions} onSelect={handleSelectTransaction} onSelectAll={handleSelectAll} />
                     <Pagination currentPage={currentPageGastos} totalPages={totalGastosPages} onPageChange={setCurrentPageGastos} />
                 </>
             }

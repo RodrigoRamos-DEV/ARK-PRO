@@ -1,5 +1,6 @@
 const db = require('../config/db');
-const crypto = require('crypto'); // Módulo nativo do Node.js para gerar tokens seguros
+const crypto = require('crypto');
+const bcrypt = require('bcryptjs');
 
 const ensureAdmin = (req, res, next) => {
     if (req.user.role !== 'admin') {
@@ -11,8 +12,19 @@ const ensureAdmin = (req, res, next) => {
 const getAllClients = async (req, res) => {
     try {
         const query = `
-            SELECT c.id, c.company_name, c.license_status, c.license_expires_at, 
-                   (SELECT u.email FROM users u WHERE u.client_id = c.id LIMIT 1) as email
+            SELECT 
+                c.id, c.company_name, c.razao_social, c.cnpj, c.inscricao_estadual,
+                c.inscricao_municipal, c.responsavel_nome, c.telefone,
+                c.endereco_logradouro, c.endereco_numero, c.endereco_bairro,
+                c.endereco_cidade, c.endereco_uf, c.endereco_cep,
+                c.regime_tributario,
+                c.license_expires_at,
+                CASE
+                    WHEN c.license_expires_at < CURRENT_DATE THEN 'Vencido'
+                    WHEN c.license_expires_at - CURRENT_DATE <= 5 THEN 'A Vencer'
+                    ELSE 'Ativo'
+                END AS license_status,
+                (SELECT u.email FROM users u WHERE u.client_id = c.id LIMIT 1) as email
             FROM clients c
             ORDER BY c.company_name;
         `;
@@ -25,54 +37,81 @@ const getAllClients = async (req, res) => {
 };
 
 const createClient = async (req, res) => {
-    const { companyName, licenseExpiresAt } = req.body;
-    if (!companyName || !licenseExpiresAt) {
-        return res.status(400).json({ error: 'Nome da empresa e data de vencimento são obrigatórios.' });
+    const { 
+        companyName, razao_social, cnpj, inscricao_estadual, inscricao_municipal,
+        responsavel_nome, telefone, endereco_logradouro, endereco_numero,
+        endereco_bairro, endereco_cidade, endereco_uf, endereco_cep,
+        regime_tributario, licenseExpiresAt
+    } = req.body;
+
+    if (!companyName || !cnpj || !licenseExpiresAt || !razao_social || !responsavel_nome || !telefone) {
+        return res.status(400).json({ error: 'Campos obrigatórios em falta.' });
     }
 
     const client = await db.query('BEGIN');
     try {
         const newClientResult = await db.query(
-            'INSERT INTO clients (company_name, license_expires_at) VALUES ($1, $2) RETURNING id',
-            [companyName, licenseExpiresAt]
+            `INSERT INTO clients (
+                company_name, razao_social, cnpj, inscricao_estadual, inscricao_municipal,
+                responsavel_nome, telefone, endereco_logradouro, endereco_numero,
+                endereco_bairro, endereco_cidade, endereco_uf, endereco_cep,
+                regime_tributario, license_expires_at, license_status
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, 'Ativo') RETURNING id`,
+            [
+                companyName, razao_social, cnpj, inscricao_estadual, inscricao_municipal,
+                responsavel_nome, telefone, endereco_logradouro, endereco_numero,
+                endereco_bairro, endereco_cidade, endereco_uf, endereco_cep,
+                regime_tributario, licenseExpiresAt
+            ]
         );
         const newClientId = newClientResult.rows[0].id;
-
-        // Gera um token de registo seguro
         const registrationToken = crypto.randomBytes(32).toString('hex');
-        // Guarda o hash do token na base de dados por segurança
         const tokenHash = crypto.createHash('sha256').update(registrationToken).digest('hex');
-        
-        // Define a validade do token (ex: 7 dias)
         const expiresAt = new Date();
         expiresAt.setDate(expiresAt.getDate() + 7);
-
         await db.query(
             'INSERT INTO registration_tokens (client_id, token_hash, expires_at) VALUES ($1, $2, $3)',
             [newClientId, tokenHash, expiresAt]
         );
-
+        
         await db.query('COMMIT');
-        // Retorna o token original (não o hash) para o admin
         res.status(201).json({ 
             msg: 'Cliente criado com sucesso! Envie o token abaixo para o cliente se registar.',
             registrationToken: registrationToken 
         });
-
     } catch (err) {
         await db.query('ROLLBACK');
         console.error(err.message);
+        if (err.code === '23505') {
+            return res.status(400).json({ error: 'Este CNPJ já está cadastrado.' });
+        }
         res.status(500).json({ error: 'Erro no servidor ao criar cliente.' });
     }
 };
 
 const updateClient = async (req, res) => {
     const { id } = req.params;
-    const { companyName, licenseStatus, licenseExpiresAt } = req.body;
+    const { 
+        companyName, razao_social, cnpj, inscricao_estadual, inscricao_municipal,
+        responsavel_nome, telefone, endereco_logradouro, endereco_numero,
+        endereco_bairro, endereco_cidade, endereco_uf, endereco_cep,
+        regime_tributario, licenseStatus, licenseExpiresAt
+    } = req.body;
     try {
         const result = await db.query(
-            'UPDATE clients SET company_name = $1, license_status = $2, license_expires_at = $3 WHERE id = $4 RETURNING *',
-            [companyName, licenseStatus, licenseExpiresAt, id]
+            `UPDATE clients SET 
+                company_name = $1, razao_social = $2, cnpj = $3, inscricao_estadual = $4, 
+                inscricao_municipal = $5, responsavel_nome = $6, telefone = $7, 
+                endereco_logradouro = $8, endereco_numero = $9, endereco_bairro = $10, 
+                endereco_cidade = $11, endereco_uf = $12, endereco_cep = $13, 
+                regime_tributario = $14, license_status = $15, license_expires_at = $16 
+            WHERE id = $17 RETURNING *`,
+            [
+                companyName, razao_social, cnpj, inscricao_estadual, inscricao_municipal,
+                responsavel_nome, telefone, endereco_logradouro, endereco_numero,
+                endereco_bairro, endereco_cidade, endereco_uf, endereco_cep,
+                regime_tributario, licenseStatus, licenseExpiresAt, id
+            ]
         );
         if (result.rowCount === 0) {
             return res.status(404).json({ error: 'Cliente não encontrado.' });
@@ -87,14 +126,55 @@ const updateClient = async (req, res) => {
 const deleteClient = async (req, res) => {
     const { id } = req.params;
     try {
-        const result = await db.query('DELETE FROM clients WHERE id = $1', [id]);
-        if (result.rowCount === 0) {
-            return res.status(404).json({ error: 'Cliente não encontrado.' });
-        }
+        await db.query('DELETE FROM clients WHERE id = $1', [id]);
         res.json({ msg: 'Cliente e todos os seus dados foram deletados com sucesso.' });
     } catch (err) {
         console.error(err.message);
         res.status(500).json({ error: 'Erro no servidor ao deletar cliente.' });
+    }
+};
+
+const renewClientLicense = async (req, res) => {
+    const { id } = req.params;
+    try {
+        const newExpiresAt = new Date();
+        newExpiresAt.setDate(newExpiresAt.getDate() + 30);
+        const result = await db.query( "UPDATE clients SET license_status = 'Ativo', license_expires_at = $1 WHERE id = $2 RETURNING *", [newExpiresAt, id] );
+        if (result.rowCount === 0) {
+            return res.status(404).json({ error: 'Cliente não encontrado.' });
+        }
+        res.json({ msg: 'Licença do cliente renovada com sucesso!' });
+    } catch (err) {
+        console.error(err.message);
+        res.status(500).json({ error: 'Erro no servidor ao renovar a licença.' });
+    }
+};
+
+const getDashboardStats = async (req, res) => {
+    try {
+        const statusQuery = `
+            SELECT 
+                COUNT(*) AS total_clients,
+                COUNT(*) FILTER (WHERE license_expires_at >= CURRENT_DATE AND license_expires_at - CURRENT_DATE > 5) AS ativos,
+                COUNT(*) FILTER (WHERE license_expires_at >= CURRENT_DATE AND license_expires_at - CURRENT_DATE <= 5) AS a_vencer,
+                COUNT(*) FILTER (WHERE license_expires_at < CURRENT_DATE) AS vencidos
+            FROM clients;
+        `;
+        const renewalsQuery = `
+            SELECT id, company_name, license_expires_at
+            FROM clients
+            WHERE license_expires_at BETWEEN CURRENT_DATE AND CURRENT_DATE + 30
+            ORDER BY license_expires_at ASC;
+        `;
+        const statusResult = await db.query(statusQuery);
+        const renewalsResult = await db.query(renewalsQuery);
+        res.json({
+            summary: statusResult.rows[0],
+            upcomingRenewals: renewalsResult.rows
+        });
+    } catch (err) {
+        console.error(err.message);
+        res.status(500).json({ error: 'Erro no servidor ao buscar dados do dashboard.' });
     }
 };
 
@@ -103,5 +183,7 @@ module.exports = {
     getAllClients,
     createClient,
     updateClient,
-    deleteClient
+    deleteClient,
+    renewClientLicense,
+    getDashboardStats
 };

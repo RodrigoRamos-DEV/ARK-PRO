@@ -17,6 +17,8 @@ const parseCurrency = (value) => {
 function TransactionModal({ isOpen, onClose, onSave, transactionToEdit, initialType = 'venda', items, allTransactions, defaultEmployeeId }) {
     const [funcionarios, setFuncionarios] = useState([]);
     const [tipo, setTipo] = useState(initialType);
+    const [attachmentFile, setAttachmentFile] = useState(null);
+
     const initialRowState = {
         employee_id: defaultEmployeeId || '',
         transaction_date: new Date().toISOString().split('T')[0],
@@ -30,6 +32,7 @@ function TransactionModal({ isOpen, onClose, onSave, transactionToEdit, initialT
 
     useEffect(() => {
         if (isOpen) {
+            setAttachmentFile(null);
             const fetchEmployees = async () => {
                 const token = localStorage.getItem('token');
                 try {
@@ -65,6 +68,10 @@ function TransactionModal({ isOpen, onClose, onSave, transactionToEdit, initialT
     }, [isOpen, transactionToEdit, initialType, defaultEmployeeId]);
 
     if (!isOpen) return null;
+
+    const handleFileChange = (e) => {
+        setAttachmentFile(e.target.files[0]);
+    };
     
     const handleRowChange = (index, e) => {
         const { name, value } = e.target;
@@ -106,45 +113,47 @@ function TransactionModal({ isOpen, onClose, onSave, transactionToEdit, initialT
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-
-        // --- VALIDAÇÃO NO FRONTEND ---
-        for (const row of rows) {
-            if (!row.employee_id) {
-                toast.error("Por favor, selecione um funcionário para cada lançamento.");
-                return;
-            }
-            
-            const descriptionType = tipo === 'venda' ? 'produto' : 'compra';
-            const categoryType = tipo === 'venda' ? 'comprador' : 'fornecedor';
-
-            const descriptionExists = items[descriptionType].some(item => item.name === row.description);
-            if (!descriptionExists) {
-                toast.error(`O item "${row.description}" não está cadastrado como um(a) ${descriptionType}. Por favor, cadastre-o primeiro.`);
-                return;
-            }
-            
-            if (row.category && row.category.trim() !== '') {
-                const categoryExists = items[categoryType].some(item => item.name === row.category);
-                if (!categoryExists) {
-                    toast.error(`O item "${row.category}" não está cadastrado como um(a) ${categoryType}. Por favor, cadastre-o primeiro.`);
+        const token = localStorage.getItem('token');
+        const API_URL = 'http://localhost:3000/api/data/transactions';
+        
+        try {
+            for (const row of rows) {
+                if (!row.employee_id) {
+                    toast.error("Por favor, selecione um funcionário para cada lançamento.");
                     return;
                 }
             }
-        }
-        
-        const token = localStorage.getItem('token');
-        const API_URL = 'http://localhost:3000/api/data/transactions';
-        try {
+
+            let transactionIdToAttach = null;
+
             if (transactionToEdit) {
                 const response = await axios.put(`${API_URL}/${transactionToEdit.id}`, { ...rows[0], type: tipo }, { headers: { 'x-auth-token': token } });
+                transactionIdToAttach = response.data.id;
                 onSave(response.data, true);
+                toast.success('Lançamento atualizado com sucesso!');
             } else {
-                for (const row of rows) {
-                    await axios.post(API_URL, { ...row, type: tipo }, { headers: { 'x-auth-token': token } });
-                }
+                const responses = await Promise.all(rows.map(row => 
+                    axios.post(API_URL, { ...row, type: tipo }, { headers: { 'x-auth-token': token } })
+                ));
+                // Para o anexo, associamos ao primeiro lançamento da lista
+                transactionIdToAttach = responses[0].data.id; 
                 onSave();
+                toast.success('Lançamentos salvos com sucesso!');
             }
-            toast.success('Lançamentos salvos com sucesso!');
+
+            if (attachmentFile && transactionIdToAttach && tipo === 'gasto') {
+                const formData = new FormData();
+                formData.append('attachment', attachmentFile);
+                await axios.post(`${API_URL}/${transactionIdToAttach}/attach`, formData, {
+                    headers: { 
+                        'x-auth-token': token,
+                        'Content-Type': 'multipart/form-data'
+                    }
+                });
+                toast.success('Anexo enviado com sucesso!');
+                onSave(); // Recarrega os dados na página principal para mostrar o ícone do clipe
+            }
+            
             onClose();
         } catch (err) {
             toast.error(err.response?.data?.error || 'Erro ao salvar o lançamento.');
@@ -186,7 +195,6 @@ function TransactionModal({ isOpen, onClose, onSave, transactionToEdit, initialT
                                         <option value="" disabled>Selecione...</option>
                                         {funcionarios.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
                                     </select>
-                                    
                                     <input name="transaction_date" type="date" value={row.transaction_date} onChange={(e) => handleRowChange(index, e)} required />
                                     <input name="quantity" type="number" placeholder="Qtd" step="0.01" value={row.quantity} onChange={(e) => handleRowChange(index, e)} required />
                                     <input name="description" placeholder={tipo === 'venda' ? 'Digite o produto' : 'Digite a compra'} value={row.description} onChange={(e) => handleRowChange(index, e)} onBlur={() => handleDescriptionBlur(index)} list="description-list" required />
@@ -204,11 +212,17 @@ function TransactionModal({ isOpen, onClose, onSave, transactionToEdit, initialT
                             );
                         })}
                     </div>
+                    
+                    {tipo === 'gasto' && (
+                         <div className="input-group" style={{marginTop: '15px'}}>
+                            <label>{transactionToEdit && transactionToEdit.attachment_id ? 'Substituir Anexo (Opcional)' : 'Anexo (Opcional)'}</label>
+                            <input type="file" name="attachment" onChange={handleFileChange} />
+                        </div>
+                    )}
 
                     {!transactionToEdit && (
                         <button type="button" onClick={addRow} className="btn" style={{ width: 'auto', marginTop: '10px' }}>Adicionar Linha</button>
                     )}
-
                     <div style={{ marginTop: '20px', display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
                         <button type="button" onClick={onClose} className="btn" style={{ backgroundColor: '#888', width: 'auto' }}>Cancelar</button>
                         <button type="submit" className="btn" style={{ width: 'auto' }}>Salvar</button>
