@@ -5,7 +5,7 @@ const csv = require('csv-parser');
 const db = require('../src/config/db');
 
 // --- CONFIGURAÇÃO ---
-const CLIENT_ID = 'a17ec0a8-a720-49da-ae84-2ae4588e7f18'; 
+const CLIENT_ID = '198f888a-1376-4228-906a-5c45af912633'; 
 const DATA_FOLDER = path.join(__dirname, 'data');
 // --------------------
 
