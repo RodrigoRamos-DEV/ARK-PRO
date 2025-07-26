@@ -42,7 +42,8 @@ exports.login = async (req, res) => {
         user: {
             id: user.id,
             clientId: user.client_id,
-            role: user.role
+            role: user.role,
+            email: user.email // Adicionado para uso no logger
         }
     };
     if (user.role === 'funcionario') {
@@ -106,7 +107,11 @@ exports.forgotPassword = async (req, res) => {
         const passwordResetToken = crypto.createHash('sha256').update(resetToken).digest('hex');
         const passwordResetExpires = new Date(Date.now() + 3600000);
         await db.query( 'UPDATE users SET password_reset_token = $1, password_reset_expires = $2 WHERE id = $3', [passwordResetToken, passwordResetExpires, user.id] );
-        const resetUrl = `http://localhost:5173/reset-password/${resetToken}`;
+        
+        // --- CORREÇÃO AQUI ---
+        // ANTES: const resetUrl = `http://localhost:5173/reset-password/${resetToken}`;
+        const resetUrl = `${process.env.FRONTEND_URL}/reset-password/${resetToken}`;
+
         const message = `<h1>Você solicitou uma redefinição de senha</h1><p>Por favor, clique neste <a href="${resetUrl}">link</a> para definir uma nova senha.</p><p>Este link expirará em 1 hora.</p>`;
         const transporter = nodemailer.createTransport({ host: process.env.EMAIL_HOST, port: process.env.EMAIL_PORT, secure: false, auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS, }, });
         await transporter.sendMail({ from: `"Sistemas ARK" <${process.env.EMAIL_USER}>`, to: user.email, subject: 'Redefinição de Senha - Sistemas ARK', html: message, });
