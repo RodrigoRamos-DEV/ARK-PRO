@@ -4,6 +4,9 @@ import { toast } from 'react-toastify';
 import ClientModal from './ClientModal';
 import ConfirmModal from './ConfirmModal';
 import { Doughnut } from 'react-chartjs-2';
+import API_URL from '../apiConfig'; // <-- Este é o import correto que vamos usar
+import { Link } from 'react-router-dom';
+
 
 // Componente para os Cartões de Estatísticas
 const StatCard = ({ title, value, color }) => (
@@ -36,15 +39,17 @@ function AdminPage() {
     const [newToken, setNewToken] = useState('');
     const [dashboardData, setDashboardData] = useState(null);
 
-    const API_URL = 'http://localhost:3000/api/admin';
+    // ANTES: const API_URL = 'http://localhost:3000/api/admin'; (Removido)
+    const ADMIN_API_URL = `${API_URL}/api/admin`; // <-- CORRIGIDO: Usa a URL importada
     const token = localStorage.getItem('token');
 
     const fetchData = async () => {
         setLoading(true);
-        try {
+       try {
             const [clientsResponse, dashboardResponse] = await Promise.all([
-                axios.get(`${API_URL}/clients`, { headers: { 'x-auth-token': token } }),
-                axios.get(`${API_URL}/dashboard`, { headers: { 'x-auth-token': token } })
+                // ANTES: axios.get(`${API_URL}/api/admin/clients`, ...)
+                axios.get(`${ADMIN_API_URL}/clients`, { headers: { 'x-auth-token': token } }), // <-- CORRIGIDO
+                axios.get(`${ADMIN_API_URL}/dashboard`, { headers: { 'x-auth-token': token } }) // <-- CORRIGIDO
             ]);
             setClients(clientsResponse.data);
             setDashboardData(dashboardResponse.data);
@@ -62,10 +67,10 @@ function AdminPage() {
     const handleSaveClient = async (formData, clientId) => {
         try {
             if (clientId) {
-                await axios.put(`${API_URL}/clients/${clientId}`, formData, { headers: { 'x-auth-token': token } });
+                await axios.put(`${ADMIN_API_URL}/clients/${clientId}`, formData, { headers: { 'x-auth-token': token } }); // <-- CORRIGIDO
                 toast.success("Cliente atualizado com sucesso!");
             } else {
-                const response = await axios.post(`${API_URL}/clients`, formData, { headers: { 'x-auth-token': token } });
+                const response = await axios.post(`${ADMIN_API_URL}/clients`, formData, { headers: { 'x-auth-token': token } }); // <-- CORRIGIDO
                 toast.success("Cliente criado com sucesso! Token gerado.");
                 setNewToken(response.data.registrationToken);
             }
@@ -83,7 +88,7 @@ function AdminPage() {
             message: `Tem certeza que deseja excluir o cliente "${client.company_name}"? Todos os seus dados (usuários, lançamentos, etc.) serão perdidos permanentemente.`,
             onConfirm: async () => {
                 try {
-                    await axios.delete(`${API_URL}/clients/${client.id}`, { headers: { 'x-auth-token': token } });
+                    await axios.delete(`${ADMIN_API_URL}/clients/${client.id}`, { headers: { 'x-auth-token': token } }); // <-- CORRIGIDO
                     toast.success("Cliente excluído com sucesso!");
                     fetchData();
                     closeConfirmModal();
@@ -101,7 +106,7 @@ function AdminPage() {
             message: `Deseja marcar o pagamento como recebido e renovar a licença de "${client.company_name}" por mais 30 dias?`,
             onConfirm: async () => {
                 try {
-                    await axios.put(`${API_URL}/clients/${client.id}/renew`, {}, { headers: { 'x-auth-token': token } });
+                    await axios.put(`${ADMIN_API_URL}/clients/${client.id}/renew`, {}, { headers: { 'x-auth-token': token } }); // <-- CORRIGIDO
                     toast.success("Licença renovada com sucesso!");
                     fetchData();
                     closeConfirmModal();

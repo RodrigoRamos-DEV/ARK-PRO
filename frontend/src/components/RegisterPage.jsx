@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import axios from 'axios';
 import { toast } from 'react-toastify';
 import { useNavigate, Link } from 'react-router-dom';
+import API_URL from '../apiConfig'; // <-- ADICIONADO
 
 function RegisterPage() {
     const [formData, setFormData] = useState({
@@ -18,7 +19,9 @@ function RegisterPage() {
         e.preventDefault();
         setIsLoading(true);
         try {
-            const response = await axios.post('http://localhost:3000/api/auth/register', formData);
+            // ANTES: const response = await axios.post('http://localhost:3000/api/auth/register', formData);
+            const response = await axios.post(`${API_URL}/api/auth/register`, formData); // <-- ALTERADO
+            
             toast.success(response.data.msg);
             navigate('/'); // Redireciona para o login após o sucesso
         } catch (error) {

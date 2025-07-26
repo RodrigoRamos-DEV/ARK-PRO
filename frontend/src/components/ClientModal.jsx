@@ -1,4 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import axios from 'axios';
+import { toast } from 'react-toastify';
+import API_URL from '../apiConfig'; // <-- ADICIONADO
 
 function ClientModal({ isOpen, onClose, onSave, clientToEdit }) {
     const [formData, setFormData] = useState({
@@ -44,7 +47,6 @@ function ClientModal({ isOpen, onClose, onSave, clientToEdit }) {
                     licenseExpiresAt: clientToEdit.license_expires_at ? new Date(clientToEdit.license_expires_at).toISOString().split('T')[0] : ''
                 });
             } else {
-                // Reseta para o estado inicial ao criar novo cliente
                 setFormData({
                     companyName: '',
                     razao_social: '',
@@ -73,9 +75,25 @@ function ClientModal({ isOpen, onClose, onSave, clientToEdit }) {
         setFormData({ ...formData, [e.target.name]: e.target.value });
     };
 
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
-        onSave(formData, clientToEdit?.id);
+        const token = localStorage.getItem('token');
+        const ADMIN_API_URL = `${API_URL}/api/admin/clients`; // <-- ADICIONADO para simplificar
+
+        try {
+            if (isEditMode) {
+                await axios.put(`${ADMIN_API_URL}/${clientToEdit.id}`, formData, { headers: { 'x-auth-token': token } }); // <-- ALTERADO
+                toast.success("Cliente atualizado com sucesso!");
+            } else {
+                const response = await axios.post(ADMIN_API_URL, formData, { headers: { 'x-auth-token': token } }); // <-- ALTERADO
+                toast.success("Cliente criado com sucesso! Token gerado.");
+                onSave(formData, null, response.data.registrationToken); // Passa o novo token para a página pai
+                return; // Retorna para evitar chamar o onSave duas vezes
+            }
+            onSave(formData, clientToEdit?.id);
+        } catch (error) {
+            toast.error(error.response?.data?.error || "Erro ao salvar cliente.");
+        }
     };
 
     return (
@@ -137,4 +155,5 @@ function ClientModal({ isOpen, onClose, onSave, clientToEdit }) {
         </div>
     );
 }
+
 export default ClientModal;

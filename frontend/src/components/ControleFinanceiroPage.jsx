@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import axios from 'axios';
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, ArcElement, Title, Tooltip, Legend } from 'chart.js';
 import { Bar, Doughnut } from 'react-chartjs-2';
+import API_URL from '../apiConfig'; // <-- ADICIONADO
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, ArcElement, Title, Tooltip, Legend);
 const formatCurrency = (value) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value || 0);
@@ -40,11 +41,13 @@ function ControleFinanceiroPage() {
         const fetchData = async () => {
             setLoading(true);
             const token = localStorage.getItem('token');
+            const DATA_API_URL = `${API_URL}/api/data`; // <-- ADICIONADO para simplificar
+
             try {
                 const [trxResponse, empResponse, itemsResponse] = await Promise.all([
-                    axios.get('http://localhost:3000/api/data/transactions', { headers: { 'x-auth-token': token } }),
-                    axios.get('http://localhost:3000/api/data/employees', { headers: { 'x-auth-token': token } }),
-                    axios.get('http://localhost:3000/api/data/items', { headers: { 'x-auth-token': token } })
+                    axios.get(`${DATA_API_URL}/transactions`, { headers: { 'x-auth-token': token } }), // <-- ALTERADO
+                    axios.get(`${DATA_API_URL}/employees`, { headers: { 'x-auth-token': token } }),    // <-- ALTERADO
+                    axios.get(`${DATA_API_URL}/items`, { headers: { 'x-auth-token': token } })          // <-- ALTERADO
                 ]);
                 setAllData({ transactions: trxResponse.data, employees: empResponse.data, items: itemsResponse.data });
             } catch (error) { console.error("Erro ao buscar dados", error); } finally { setLoading(false); }
@@ -119,7 +122,9 @@ function ControleFinanceiroPage() {
                 viewType,
                 employeeName
             };
-            const response = await axios.post('http://localhost:3000/api/data/generate-report', reportData, { headers: { 'x-auth-token': token } });
+            
+            const response = await axios.post(`${API_URL}/api/data/generate-report`, reportData, { headers: { 'x-auth-token': token } }); // <-- ALTERADO
+            
             const reportHtml = response.data;
             const reportWindow = window.open('', '_blank');
             reportWindow.document.write(reportHtml);

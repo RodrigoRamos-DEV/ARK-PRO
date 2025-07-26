@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { toast } from 'react-toastify';
+import API_URL from '../apiConfig'; // <-- ADICIONADO
 
 const formatCurrency = (value) => {
     if (isNaN(value) || value === null || value === '') return '';
@@ -29,6 +30,8 @@ function TransactionModal({ isOpen, onClose, onSave, transactionToEdit, initialT
         status: 'A Pagar'
     };
     const [rows, setRows] = useState([initialRowState]);
+    
+    const DATA_API_URL = `${API_URL}/api/data`; // <-- ADICIONADO para simplificar
 
     useEffect(() => {
         if (isOpen) {
@@ -36,7 +39,7 @@ function TransactionModal({ isOpen, onClose, onSave, transactionToEdit, initialT
             const fetchEmployees = async () => {
                 const token = localStorage.getItem('token');
                 try {
-                    const response = await axios.get('http://localhost:3000/api/data/employees', { headers: { 'x-auth-token': token } });
+                    const response = await axios.get(`${DATA_API_URL}/employees`, { headers: { 'x-auth-token': token } }); // <-- ALTERADO
                     setFuncionarios(response.data);
                     if (response.data.length > 0 && !transactionToEdit && !defaultEmployeeId) {
                         setRows(prev => {
@@ -114,7 +117,7 @@ function TransactionModal({ isOpen, onClose, onSave, transactionToEdit, initialT
     const handleSubmit = async (e) => {
         e.preventDefault();
         const token = localStorage.getItem('token');
-        const API_URL = 'http://localhost:3000/api/data/transactions';
+        const TRANSACTIONS_API_URL = `${DATA_API_URL}/transactions`; // <-- ALTERADO
         
         try {
             for (const row of rows) {
@@ -127,13 +130,13 @@ function TransactionModal({ isOpen, onClose, onSave, transactionToEdit, initialT
             let transactionIdToAttach = null;
 
             if (transactionToEdit) {
-                const response = await axios.put(`${API_URL}/${transactionToEdit.id}`, { ...rows[0], type: tipo }, { headers: { 'x-auth-token': token } });
+                const response = await axios.put(`${TRANSACTIONS_API_URL}/${transactionToEdit.id}`, { ...rows[0], type: tipo }, { headers: { 'x-auth-token': token } }); // <-- ALTERADO
                 transactionIdToAttach = response.data.id;
                 onSave(response.data, true);
                 toast.success('Lançamento atualizado com sucesso!');
             } else {
                 const responses = await Promise.all(rows.map(row => 
-                    axios.post(API_URL, { ...row, type: tipo }, { headers: { 'x-auth-token': token } })
+                    axios.post(TRANSACTIONS_API_URL, { ...row, type: tipo }, { headers: { 'x-auth-token': token } }) // <-- ALTERADO
                 ));
                 // Para o anexo, associamos ao primeiro lançamento da lista
                 transactionIdToAttach = responses[0].data.id; 
@@ -144,7 +147,7 @@ function TransactionModal({ isOpen, onClose, onSave, transactionToEdit, initialT
             if (attachmentFile && transactionIdToAttach && tipo === 'gasto') {
                 const formData = new FormData();
                 formData.append('attachment', attachmentFile);
-                await axios.post(`${API_URL}/${transactionIdToAttach}/attach`, formData, {
+                await axios.post(`${TRANSACTIONS_API_URL}/${transactionIdToAttach}/attach`, formData, { // <-- ALTERADO
                     headers: { 
                         'x-auth-token': token,
                         'Content-Type': 'multipart/form-data'

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import axios from 'axios';
 import { toast } from 'react-toastify';
 import { Link } from 'react-router-dom';
+import API_URL from '../apiConfig';
 
 function ForgotPasswordPage() {
     const [email, setEmail] = useState('');
@@ -13,7 +14,9 @@ function ForgotPasswordPage() {
         setIsLoading(true);
         setMessage('');
         try {
-            const response = await axios.post('http://localhost:3000/api/auth/forgot-password', { email });
+            // ANTES: const response = await axios.post('http://localhost:3000/api/auth/forgot-password', { email });
+            const response = await axios.post(`${API_URL}/api/auth/forgot-password`, { email }); // <-- ALTERADO
+            
             toast.success(response.data.msg);
             setMessage(response.data.msg);
         } catch (error) {

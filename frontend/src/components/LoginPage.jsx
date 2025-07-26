@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useNavigate, Link } from 'react-router-dom';
 import { toast } from 'react-toastify';
+import API_URL from '../apiConfig'; 
 
 function LoginPage() {
     const [email, setEmail] = useState('');
@@ -26,7 +27,9 @@ function LoginPage() {
         e.preventDefault();
         setIsLoading(true);
         try {
-            const response = await axios.post('http://localhost:3000/api/auth/login', { email, password });
+            
+                        const response = await axios.post(`${API_URL}/api/auth/login`, { email, password });
+
             localStorage.setItem('token', response.data.token);
             localStorage.setItem('user', JSON.stringify(response.data.user));
             if (response.data.user.role === 'admin') {

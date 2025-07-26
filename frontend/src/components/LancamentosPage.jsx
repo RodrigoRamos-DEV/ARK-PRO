@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import axios from 'axios';
-import { toast } from 'react-toastify'; // LINHA ADICIONADA
+import { toast } from 'react-toastify';
 import TransactionModal from './TransactionModal';
 import ConfirmModal from './ConfirmModal';
 import Pagination from './Pagination';
+import API_URL from '../apiConfig'; // <-- ADICIONADO
 
 const ITEMS_PER_PAGE = 10;
 
@@ -41,7 +42,7 @@ const TransactionTable = ({ title, transactions, onEdit, onDelete, onDeleteAttac
                 <td style={{ padding: '10px', textAlign: 'center' }}>
                     {trx.attachment_id && (
                         <>
-                            <a href={`http://localhost:3000/${trx.file_path.replace(/\\/g, '/')}`} target="_blank" rel="noopener noreferrer" title={trx.file_name} style={{textDecoration: 'none', fontSize: '1.2em', marginRight: '10px'}}>📎</a>
+                            <a href={`${API_URL}/${trx.file_path.replace(/\\/g, '/')}`} target="_blank" rel="noopener noreferrer" title={trx.file_name} style={{textDecoration: 'none', fontSize: '1.2em', marginRight: '10px'}}>📎</a>
                             <button onClick={() => onDeleteAttachment(trx.attachment_id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--cor-erro)', fontWeight: 'bold', fontSize: '1.2em', marginRight: '10px' }} title="Excluir Anexo">✖</button>
                         </>
                     )}
@@ -73,13 +74,15 @@ function LancamentosPage() {
     const [filters, setFilters] = useState({ employeeId: '', startDate: '', endDate: '', status: 'todos', product: 'todos', buyer: 'todos', purchase: 'todos', supplier: 'todos' });
     const [currentPageVendas, setCurrentPageVendas] = useState(1);
     const [currentPageGastos, setCurrentPageGastos] = useState(1);
+    
+    const DATA_API_URL = `${API_URL}/api/data`; // <-- ADICIONADO para simplificar
 
     const fetchInitialData = async () => {
         const token = localStorage.getItem('token');
         try {
             const [empResponse, itemsResponse] = await Promise.all([
-                axios.get('http://localhost:3000/api/data/employees', { headers: { 'x-auth-token': token } }),
-                axios.get('http://localhost:3000/api/data/items', { headers: { 'x-auth-token': token } })
+                axios.get(`${DATA_API_URL}/employees`, { headers: { 'x-auth-token': token } }), // <-- ALTERADO
+                axios.get(`${DATA_API_URL}/items`, { headers: { 'x-auth-token': token } })     // <-- ALTERADO
             ]);
             setFuncionarios(empResponse.data);
             setItems(itemsResponse.data);
@@ -101,7 +104,7 @@ function LancamentosPage() {
         const token = localStorage.getItem('token');
         try {
             const params = new URLSearchParams(filters);
-            const response = await axios.get(`http://localhost:3000/api/data/transactions?${params.toString()}`, { headers: { 'x-auth-token': token } });
+            const response = await axios.get(`${DATA_API_URL}/transactions?${params.toString()}`, { headers: { 'x-auth-token': token } }); // <-- ALTERADO
             setTransactions(response.data);
         } catch (err) { setError('Não foi possível carregar as transações.'); } finally { setLoading(false); }
     }, [filters]);
@@ -135,7 +138,7 @@ function LancamentosPage() {
             onConfirm: async () => {
                 const token = localStorage.getItem('token');
                 try {
-                    await axios.delete(`http://localhost:3000/api/data/transactions/${transactionId}`, { headers: { 'x-auth-token': token } });
+                    await axios.delete(`${DATA_API_URL}/transactions/${transactionId}`, { headers: { 'x-auth-token': token } }); // <-- ALTERADO
                     setTransactions(prev => prev.filter(trx => trx.id !== transactionId));
                     closeConfirmModal();
                 } catch (err) {
@@ -153,7 +156,7 @@ function LancamentosPage() {
             onConfirm: async () => {
                 const token = localStorage.getItem('token');
                 try {
-                    await axios.delete(`http://localhost:3000/api/data/attachments/${attachmentId}`, { headers: { 'x-auth-token': token } });
+                    await axios.delete(`${DATA_API_URL}/attachments/${attachmentId}`, { headers: { 'x-auth-token': token } }); // <-- ALTERADO
                     toast.success("Anexo excluído com sucesso!");
                     fetchTransactions();
                     closeConfirmModal();
@@ -200,7 +203,7 @@ function LancamentosPage() {
             onConfirm: async () => {
                 const token = localStorage.getItem('token');
                 try {
-                    await axios.post('http://localhost:3000/api/data/transactions/batch-delete', { ids: selectedTransactions }, { headers: { 'x-auth-token': token } });
+                    await axios.post(`${DATA_API_URL}/transactions/batch-delete`, { ids: selectedTransactions }, { headers: { 'x-auth-token': token } }); // <-- ALTERADO
                     setTransactions(prev => prev.filter(trx => !selectedTransactions.includes(trx.id)));
                     setSelectedTransactions([]);
                     closeConfirmModal();

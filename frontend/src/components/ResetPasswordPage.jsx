@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import axios from 'axios';
 import { toast } from 'react-toastify';
 import { useParams, useNavigate, Link } from 'react-router-dom';
+import API_URL from '../apiConfig'; // <-- ADICIONADO
 
 function ResetPasswordPage() {
     const [password, setPassword] = useState('');
@@ -20,7 +21,9 @@ function ResetPasswordPage() {
         }
         setIsLoading(true);
         try {
-            const response = await axios.post(`http://localhost:3000/api/auth/reset-password/${token}`, { password });
+            // ANTES: const response = await axios.post(`http://localhost:3000/api/auth/reset-password/${token}`, { password });
+            const response = await axios.post(`${API_URL}/api/auth/reset-password/${token}`, { password }); // <-- ALTERADO
+            
             toast.success(response.data.msg);
             navigate('/');
         } catch (error) {
