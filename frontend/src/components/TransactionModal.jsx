@@ -178,17 +178,7 @@ function TransactionModal({ isOpen, onClose, onSave, transactionToEdit, initialT
                 <form onSubmit={handleSubmit}>
                     <div style={{ maxHeight: '400px', overflowY: 'auto', paddingRight: '15px' }}>
                         
-                        <div style={{ display: 'grid', gridTemplateColumns: gridColumns, gap: '10px', fontWeight: 'bold', marginBottom: '5px', color: 'var(--cor-texto-label)', fontSize: '0.9em' }}>
-                            <div style={{ textAlign: 'center' }}>Funcionário</div>
-                            <div style={{ textAlign: 'center' }}>Data</div>
-                            <div style={{ textAlign: 'center' }}>Qtd</div>
-                            <div style={{ textAlign: 'center' }}>{tipo === 'venda' ? 'Produto' : 'Compra'}</div>
-                            <div style={{ textAlign: 'center' }}>{tipo === 'venda' ? 'Comprador' : 'Fornecedor'}</div>
-                            <div style={{ textAlign: 'center' }}>Valor Unitário</div>
-                            <div style={{ textAlign: 'center' }}>Total</div>
-                            <div style={{ textAlign: 'center' }}>Status</div>
-                            {!transactionToEdit && <div />}
-                        </div>
+                       
 
                         {rows.map((row, index) => {
     const total = (row.quantity || 0) * (row.unit_price || 0);
