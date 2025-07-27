@@ -294,3 +294,79 @@ input[type=number] {
         text-align: left;
     }
 }
+
+@media (max-width: 768px) {
+    .transaction-modal-row {
+        display: grid !important;
+        grid-template-columns: 1fr !important;
+        gap: 10px;
+        background-color: var(--cor-card);
+        padding: 15px;
+        border-radius: 10px;
+        margin-bottom: 15px;
+    }
+
+    .transaction-modal-row input,
+    .transaction-modal-row select {
+        font-size: 1rem;
+    }
+
+    .transaction-modal-row button {
+        align-self: end;
+        width: 100%;
+    }
+
+    .transaction-modal-header {
+        display: none; /* oculta cabeçalho de colunas no mobile */
+    }
+
+    .card {
+        width: 100%;
+        max-width: 100%;
+        padding: 15px;
+        margin: 10px;
+    }
+
+    .btn {
+        padding: 12px;
+        font-size: 1rem;
+    }
+}
+@media (max-width: 768px) {
+    .transaction-modal-row {
+        display: grid !important;
+        grid-template-columns: 1fr !important;
+        gap: 10px;
+        background-color: var(--cor-card);
+        padding: 15px;
+        border-radius: 10px;
+        margin-bottom: 15px;
+        box-shadow: var(--sombra-card);
+    }
+
+    .transaction-modal-row input,
+    .transaction-modal-row select,
+    .transaction-modal-row button {
+        font-size: 1rem;
+    }
+
+    .transaction-modal-header {
+        display: none;
+    }
+
+    .card {
+        width: 95%;
+        max-width: 100%;
+        padding: 20px;
+        margin: 15px auto;
+    }
+
+    .btn {
+        font-size: 1rem;
+        padding: 12px;
+    }
+
+    input, select {
+        font-size: 1rem;
+    }
+}

@@ -191,29 +191,67 @@ function TransactionModal({ isOpen, onClose, onSave, transactionToEdit, initialT
                         </div>
 
                         {rows.map((row, index) => {
-                            const total = (row.quantity || 0) * (row.unit_price || 0);
-                            return (
-                                <div key={index} className="transaction-modal-row" style={{ gridTemplateColumns: gridColumns }}>
-                                    <select name="employee_id" value={row.employee_id} onChange={(e) => handleRowChange(index, e)} required disabled={!!defaultEmployeeId && !transactionToEdit}>
-                                        <option value="" disabled>Selecione...</option>
-                                        {funcionarios.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
-                                    </select>
-                                    <input name="transaction_date" type="date" value={row.transaction_date} onChange={(e) => handleRowChange(index, e)} required />
-                                    <input name="quantity" type="number" placeholder="Qtd" step="0.01" value={row.quantity} onChange={(e) => handleRowChange(index, e)} required />
-                                    <input name="description" placeholder={tipo === 'venda' ? 'Digite o produto' : 'Digite a compra'} value={row.description} onChange={(e) => handleRowChange(index, e)} onBlur={() => handleDescriptionBlur(index)} list="description-list" required />
-                                    <input name="category" placeholder={tipo === 'venda' ? 'Selecione o comprador' : 'Selecione o fornecedor'} value={row.category} onChange={(e) => handleRowChange(index, e)} onBlur={() => handleDescriptionBlur(index)} list="category-list" />
-                                    <input type="text" name="unit_price" placeholder="R$ 0,00" value={formatCurrency(row.unit_price)} onChange={(e) => handleRowChange(index, e)} required />
-                                    <input name="total" placeholder="Total" value={formatCurrency(total)} disabled style={{ backgroundColor: 'var(--cor-borda)' }} />
-                                    <select name="status" value={row.status} onChange={(e) => handleRowChange(index, e)} required>
-                                        <option value="A Pagar">A Pagar</option>
-                                        <option value="Pago">Pago</option>
-                                    </select>
-                                    {!transactionToEdit && (
-                                        <button type="button" onClick={() => removeRow(index)} className="btn" style={{ backgroundColor: 'transparent', color: 'var(--cor-erro)', padding: '5px', width: 'auto', border: 'none' }}>✖</button>
-                                    )}
-                                </div>
-                            );
-                        })}
+    const total = (row.quantity || 0) * (row.unit_price || 0);
+    return (
+        <div key={index} className="transaction-modal-row" style={{ gridTemplateColumns: gridColumns }}>
+            <div>
+                <label>Funcionário</label>
+                <select name="employee_id" value={row.employee_id} onChange={(e) => handleRowChange(index, e)} required disabled={!!defaultEmployeeId && !transactionToEdit}>
+                    <option value="" disabled>Selecione...</option>
+                    {funcionarios.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
+                </select>
+            </div>
+
+            <div>
+                <label>Data</label>
+                <input name="transaction_date" type="date" value={row.transaction_date} onChange={(e) => handleRowChange(index, e)} required />
+            </div>
+
+            <div>
+                <label>Qtd</label>
+                <input name="quantity" type="number" step="0.01" value={row.quantity} onChange={(e) => handleRowChange(index, e)} required />
+            </div>
+
+            <div>
+                <label>{tipo === 'venda' ? 'Produto' : 'Compra'}</label>
+                <input name="description" value={row.description} onChange={(e) => handleRowChange(index, e)} onBlur={() => handleDescriptionBlur(index)} list="description-list" required />
+            </div>
+
+            <div>
+                <label>{tipo === 'venda' ? 'Comprador' : 'Fornecedor'}</label>
+                <input name="category" value={row.category} onChange={(e) => handleRowChange(index, e)} list="category-list" />
+            </div>
+
+            <div>
+                <label>Valor Unitário</label>
+                <input type="text" name="unit_price" value={formatCurrency(row.unit_price)} onChange={(e) => handleRowChange(index, e)} required />
+            </div>
+
+            <div>
+                <label>Total</label>
+                <input name="total" value={formatCurrency(total)} disabled />
+            </div>
+
+            <div>
+                <label>Status</label>
+                <select name="status" value={row.status} onChange={(e) => handleRowChange(index, e)} required>
+                    <option value="A Pagar">A Pagar</option>
+                    <option value="Pago">Pago</option>
+                </select>
+            </div>
+
+            {!transactionToEdit && (
+                <div>
+                    <label>Remover</label>
+                    <button type="button" onClick={() => removeRow(index)} className="btn" style={{ backgroundColor: 'var(--cor-erro)', width: '100%' }}>
+                        ✖ Remover
+                    </button>
+                </div>
+            )}
+        </div>
+    );
+})}
+
                     </div>
                     
                     {tipo === 'gasto' && (
