@@ -161,15 +161,19 @@ exports.deleteTransaction = async (req, res) => {
 exports.batchDeleteTransactions = async (req, res) => {
     const { ids } = req.body;
     if (!ids || !Array.isArray(ids) || ids.length === 0) { return res.status(400).json({ error: 'Uma lista de IDs é necessária.' }); }
-    const client = await db.query('BEGIN');
+    
+    const client = await db.getClient();
     try {
-        await db.query( 'DELETE FROM transactions WHERE id = ANY($1) AND client_id = $2', [ids, req.user.clientId] );
-        await db.query('COMMIT');
+        await client.query('BEGIN');
+        await client.query( 'DELETE FROM transactions WHERE id = ANY($1) AND client_id = $2', [ids, req.user.clientId] );
+        await client.query('COMMIT');
         res.json({ msg: 'Lançamentos selecionados foram deletados com sucesso.' });
     } catch (err) {
-        await db.query('ROLLBACK');
+        await client.query('ROLLBACK');
         console.error(err.message);
         res.status(500).json({ error: 'Erro no servidor ao deletar lançamentos.' });
+    } finally {
+        client.release();
     }
 };
 
@@ -238,7 +242,7 @@ exports.generateReport = async (req, res) => {
     res.send(html);
 };
 
-exports.addAttachment = (req, res) => {
+exports.addAttachment = async (req, res) => {
     upload.single('attachment')(req, res, async function (err) {
         if (err) { console.error("Multer error:", err); return res.status(500).json({ error: "Erro no upload do ficheiro." }); }
         if (!req.file) { return res.status(400).json({ error: "Nenhum ficheiro enviado." }); }
@@ -251,7 +255,7 @@ exports.addAttachment = (req, res) => {
                 return res.status(403).json({ error: "Acesso negado a esta transação." });
             }
             await db.query('DELETE FROM attachments WHERE transaction_id = $1', [transactionId]);
-            const attachResult = await db.query( 'INSERT INTO attachments (client_id, transaction_id, file_name, file_path, file_type) VALUES ($1, $2, $3, $4, $5) RETURNING id', [req.user.clientId, transactionId, originalname, filePath, mimetype] );
+            await db.query( 'INSERT INTO attachments (client_id, transaction_id, file_name, file_path, file_type) VALUES ($1, $2, $3, $4, $5) RETURNING id', [req.user.clientId, transactionId, originalname, filePath, mimetype] );
             res.status(201).json({ msg: 'Anexo adicionado com sucesso!' });
         } catch (dbErr) {
             console.error(dbErr.message);

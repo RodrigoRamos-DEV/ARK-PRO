@@ -44,13 +44,16 @@ const createClient = async (req, res) => {
         regime_tributario, licenseExpiresAt
     } = req.body;
 
-    if (!companyName || !cnpj || !licenseExpiresAt || !razao_social || !responsavel_nome || !telefone) {
-        return res.status(400).json({ error: 'Campos obrigatórios em falta.' });
+    // --- ALTERAÇÃO AQUI: CNPJ foi removido da lista de campos obrigatórios ---
+    if (!companyName || !licenseExpiresAt || !razao_social || !responsavel_nome || !telefone) {
+        return res.status(400).json({ error: 'Nome da empresa, Razão Social, Responsável, Telefone e Data de Vencimento são obrigatórios.' });
     }
 
-    const client = await db.query('BEGIN');
+    const client = await db.getClient();
     try {
-        const newClientResult = await db.query(
+        await client.query('BEGIN');
+
+        const newClientResult = await client.query(
             `INSERT INTO clients (
                 company_name, razao_social, cnpj, inscricao_estadual, inscricao_municipal,
                 responsavel_nome, telefone, endereco_logradouro, endereco_numero,
@@ -58,7 +61,7 @@ const createClient = async (req, res) => {
                 regime_tributario, license_expires_at, license_status
             ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, 'Ativo') RETURNING id`,
             [
-                companyName, razao_social, cnpj, inscricao_estadual, inscricao_municipal,
+                companyName, razao_social, cnpj || null, inscricao_estadual, inscricao_municipal,
                 responsavel_nome, telefone, endereco_logradouro, endereco_numero,
                 endereco_bairro, endereco_cidade, endereco_uf, endereco_cep,
                 regime_tributario, licenseExpiresAt
@@ -69,23 +72,25 @@ const createClient = async (req, res) => {
         const tokenHash = crypto.createHash('sha256').update(registrationToken).digest('hex');
         const expiresAt = new Date();
         expiresAt.setDate(expiresAt.getDate() + 7);
-        await db.query(
+        await client.query(
             'INSERT INTO registration_tokens (client_id, token_hash, expires_at) VALUES ($1, $2, $3)',
             [newClientId, tokenHash, expiresAt]
         );
         
-        await db.query('COMMIT');
+        await client.query('COMMIT');
         res.status(201).json({ 
             msg: 'Cliente criado com sucesso! Envie o token abaixo para o cliente se registar.',
             registrationToken: registrationToken 
         });
     } catch (err) {
-        await db.query('ROLLBACK');
+        await client.query('ROLLBACK');
         console.error(err.message);
         if (err.code === '23505') {
             return res.status(400).json({ error: 'Este CNPJ já está cadastrado.' });
         }
         res.status(500).json({ error: 'Erro no servidor ao criar cliente.' });
+    } finally {
+        client.release();
     }
 };
 
@@ -107,7 +112,7 @@ const updateClient = async (req, res) => {
                 regime_tributario = $14, license_status = $15, license_expires_at = $16 
             WHERE id = $17 RETURNING *`,
             [
-                companyName, razao_social, cnpj, inscricao_estadual, inscricao_municipal,
+                companyName, razao_social, cnpj || null, inscricao_estadual, inscricao_municipal,
                 responsavel_nome, telefone, endereco_logradouro, endereco_numero,
                 endereco_bairro, endereco_cidade, endereco_uf, endereco_cep,
                 regime_tributario, licenseStatus, licenseExpiresAt, id

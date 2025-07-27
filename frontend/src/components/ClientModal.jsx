@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { toast } from 'react-toastify';
-import API_URL from '../apiConfig'; // <-- ADICIONADO
+import API_URL from '../apiConfig';
 
 function ClientModal({ isOpen, onClose, onSave, clientToEdit }) {
     const [formData, setFormData] = useState({
@@ -78,19 +78,18 @@ function ClientModal({ isOpen, onClose, onSave, clientToEdit }) {
     const handleSubmit = async (e) => {
         e.preventDefault();
         const token = localStorage.getItem('token');
-        const ADMIN_API_URL = `${API_URL}/api/admin/clients`; // <-- ADICIONADO para simplificar
+        const ADMIN_API_URL = `${API_URL}/api/admin/clients`;
 
         try {
             if (isEditMode) {
-                await axios.put(`${ADMIN_API_URL}/${clientToEdit.id}`, formData, { headers: { 'x-auth-token': token } }); // <-- ALTERADO
+                await axios.put(`${ADMIN_API_URL}/${clientToEdit.id}`, formData, { headers: { 'x-auth-token': token } });
                 toast.success("Cliente atualizado com sucesso!");
+                onSave(formData, clientToEdit?.id); // Correção para fechar o modal
             } else {
-                const response = await axios.post(ADMIN_API_URL, formData, { headers: { 'x-auth-token': token } }); // <-- ALTERADO
+                const response = await axios.post(ADMIN_API_URL, formData, { headers: { 'x-auth-token': token } });
                 toast.success("Cliente criado com sucesso! Token gerado.");
-                onSave(formData, null, response.data.registrationToken); // Passa o novo token para a página pai
-                return; // Retorna para evitar chamar o onSave duas vezes
+                onSave(formData, null, response.data.registrationToken);
             }
-            onSave(formData, clientToEdit?.id);
         } catch (error) {
             toast.error(error.response?.data?.error || "Erro ao salvar cliente.");
         }
@@ -108,7 +107,8 @@ function ClientModal({ isOpen, onClose, onSave, clientToEdit }) {
                         <div className="input-group"><label>Razão Social*</label><input type="text" name="razao_social" value={formData.razao_social} onChange={handleChange} required /></div>
                     </div>
                     <div className="grid-2-col">
-                        <div className="input-group"><label>CNPJ*</label><input type="text" name="cnpj" value={formData.cnpj} onChange={handleChange} required /></div>
+                        {/* --- ALTERAÇÃO AQUI: 'required' removido e '*' removido do label --- */}
+                        <div className="input-group"><label>CNPJ</label><input type="text" name="cnpj" value={formData.cnpj} onChange={handleChange} /></div>
                         <div className="input-group"><label>Inscrição Estadual</label><input type="text" name="inscricao_estadual" value={formData.inscricao_estadual} onChange={handleChange} /></div>
                     </div>
 
