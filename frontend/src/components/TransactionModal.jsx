@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { toast } from 'react-toastify';
-import API_URL from '../apiConfig'; // <-- ADICIONADO
+import API_URL from '../apiConfig';
 
 const formatCurrency = (value) => {
     if (isNaN(value) || value === null || value === '') return '';
@@ -25,13 +25,13 @@ function TransactionModal({ isOpen, onClose, onSave, transactionToEdit, initialT
         transaction_date: new Date().toISOString().split('T')[0],
         description: '',
         category: '',
-        quantity: 1,
+        quantity: '', // <-- CORREÇÃO 1: Quantidade agora começa em branco
         unit_price: '',
         status: 'A Pagar'
     };
     const [rows, setRows] = useState([initialRowState]);
     
-    const DATA_API_URL = `${API_URL}/api/data`; // <-- ADICIONADO para simplificar
+    const DATA_API_URL = `${API_URL}/api/data`;
 
     useEffect(() => {
         if (isOpen) {
@@ -39,7 +39,7 @@ function TransactionModal({ isOpen, onClose, onSave, transactionToEdit, initialT
             const fetchEmployees = async () => {
                 const token = localStorage.getItem('token');
                 try {
-                    const response = await axios.get(`${DATA_API_URL}/employees`, { headers: { 'x-auth-token': token } }); // <-- ALTERADO
+                    const response = await axios.get(`${DATA_API_URL}/employees`, { headers: { 'x-auth-token': token } });
                     setFuncionarios(response.data);
                     if (response.data.length > 0 && !transactionToEdit && !defaultEmployeeId) {
                         setRows(prev => {
@@ -89,23 +89,28 @@ function TransactionModal({ isOpen, onClose, onSave, transactionToEdit, initialT
         setRows(newRows);
     };
 
+    // --- CORREÇÃO 2: LÓGICA DE PREENCHIMENTO AUTOMÁTICO DO PREÇO ---
     const handleDescriptionBlur = (index) => {
         const currentRow = rows[index];
+        // Só executa se tivermos a descrição, a categoria, e o preço ainda estiver em branco
         if (currentRow.description && currentRow.category && allTransactions && !currentRow.unit_price) {
+            // Procura a última transação para a mesma combinação de descrição e categoria
             const lastTransaction = allTransactions
                 .filter(t => t.description === currentRow.description && t.category === currentRow.category)
                 .sort((a, b) => new Date(b.transaction_date) - new Date(a.transaction_date))[0];
+            
             if (lastTransaction) {
                 const newRows = [...rows];
                 newRows[index].unit_price = lastTransaction.unit_price;
                 setRows(newRows);
+                toast.info(`Preço unitário preenchido com base no último lançamento: ${formatCurrency(lastTransaction.unit_price)}`);
             }
         }
     };
 
     const addRow = () => {
         const lastRow = rows[rows.length - 1];
-        setRows([...rows, { ...lastRow, description: '', category: '', quantity: 1, unit_price: '' }]);
+        setRows([...rows, { ...lastRow, description: '', category: '', quantity: '', unit_price: '' }]);
     };
 
     const removeRow = (index) => {
@@ -117,7 +122,7 @@ function TransactionModal({ isOpen, onClose, onSave, transactionToEdit, initialT
     const handleSubmit = async (e) => {
         e.preventDefault();
         const token = localStorage.getItem('token');
-        const TRANSACTIONS_API_URL = `${DATA_API_URL}/transactions`; // <-- ALTERADO
+        const TRANSACTIONS_API_URL = `${DATA_API_URL}/transactions`;
         
         try {
             for (const row of rows) {
@@ -130,15 +135,14 @@ function TransactionModal({ isOpen, onClose, onSave, transactionToEdit, initialT
             let transactionIdToAttach = null;
 
             if (transactionToEdit) {
-                const response = await axios.put(`${TRANSACTIONS_API_URL}/${transactionToEdit.id}`, { ...rows[0], type: tipo }, { headers: { 'x-auth-token': token } }); // <-- ALTERADO
+                const response = await axios.put(`${TRANSACTIONS_API_URL}/${transactionToEdit.id}`, { ...rows[0], type: tipo }, { headers: { 'x-auth-token': token } });
                 transactionIdToAttach = response.data.id;
                 onSave(response.data, true);
                 toast.success('Lançamento atualizado com sucesso!');
             } else {
                 const responses = await Promise.all(rows.map(row => 
-                    axios.post(TRANSACTIONS_API_URL, { ...row, type: tipo }, { headers: { 'x-auth-token': token } }) // <-- ALTERADO
+                    axios.post(TRANSACTIONS_API_URL, { ...row, type: tipo }, { headers: { 'x-auth-token': token } })
                 ));
-                // Para o anexo, associamos ao primeiro lançamento da lista
                 transactionIdToAttach = responses[0].data.id; 
                 onSave();
                 toast.success('Lançamentos salvos com sucesso!');
@@ -147,14 +151,14 @@ function TransactionModal({ isOpen, onClose, onSave, transactionToEdit, initialT
             if (attachmentFile && transactionIdToAttach && tipo === 'gasto') {
                 const formData = new FormData();
                 formData.append('attachment', attachmentFile);
-                await axios.post(`${TRANSACTIONS_API_URL}/${transactionIdToAttach}/attach`, formData, { // <-- ALTERADO
+                await axios.post(`${TRANSACTIONS_API_URL}/${transactionIdToAttach}/attach`, formData, {
                     headers: { 
                         'x-auth-token': token,
                         'Content-Type': 'multipart/form-data'
                     }
                 });
                 toast.success('Anexo enviado com sucesso!');
-                onSave(); // Recarrega os dados na página principal para mostrar o ícone do clipe
+                onSave();
             }
             
             onClose();
@@ -178,75 +182,47 @@ function TransactionModal({ isOpen, onClose, onSave, transactionToEdit, initialT
                 <form onSubmit={handleSubmit}>
                     <div style={{ maxHeight: '400px', overflowY: 'auto', paddingRight: '15px' }}>
                         
-                       
+                        <div style={{ display: 'grid', gridTemplateColumns: gridColumns, gap: '10px', fontWeight: 'bold', marginBottom: '5px', color: 'var(--cor-texto-label)', fontSize: '0.9em' }}>
+                            <div style={{ textAlign: 'center' }}>Funcionário</div>
+                            <div style={{ textAlign: 'center' }}>Data</div>
+                            <div style={{ textAlign: 'center' }}>Qtd</div>
+                            <div style={{ textAlign: 'center' }}>{tipo === 'venda' ? 'Produto' : 'Compra'}</div>
+                            <div style={{ textAlign: 'center' }}>{tipo === 'venda' ? 'Comprador' : 'Fornecedor'}</div>
+                            <div style={{ textAlign: 'center' }}>Valor Unitário</div>
+                            <div style={{ textAlign: 'center' }}>Total</div>
+                            <div style={{ textAlign: 'center' }}>Status</div>
+                            {!transactionToEdit && <div />}
+                        </div>
 
                         {rows.map((row, index) => {
-    const total = (row.quantity || 0) * (row.unit_price || 0);
-    return (
-        <div key={index} className="transaction-modal-row" style={{ gridTemplateColumns: gridColumns }}>
-            <div>
-                <label>Funcionário</label>
-                <select name="employee_id" value={row.employee_id} onChange={(e) => handleRowChange(index, e)} required disabled={!!defaultEmployeeId && !transactionToEdit}>
-                    <option value="" disabled>Selecione...</option>
-                    {funcionarios.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
-                </select>
-            </div>
-
-            <div>
-                <label>Data</label>
-                <input name="transaction_date" type="date" value={row.transaction_date} onChange={(e) => handleRowChange(index, e)} required />
-            </div>
-
-            <div>
-                <label>Qtd</label>
-                <input name="quantity" type="number" step="0.01" value={row.quantity} onChange={(e) => handleRowChange(index, e)} required />
-            </div>
-
-            <div>
-                <label>{tipo === 'venda' ? 'Produto' : 'Compra'}</label>
-                <input name="description" value={row.description} onChange={(e) => handleRowChange(index, e)} onBlur={() => handleDescriptionBlur(index)} list="description-list" required />
-            </div>
-
-            <div>
-                <label>{tipo === 'venda' ? 'Comprador' : 'Fornecedor'}</label>
-                <input name="category" value={row.category} onChange={(e) => handleRowChange(index, e)} list="category-list" />
-            </div>
-
-            <div>
-                <label>Valor Unitário</label>
-                <input type="text" name="unit_price" value={formatCurrency(row.unit_price)} onChange={(e) => handleRowChange(index, e)} required />
-            </div>
-
-            <div>
-                <label>Total</label>
-                <input name="total" value={formatCurrency(total)} disabled />
-            </div>
-
-            <div>
-                <label>Status</label>
-                <select name="status" value={row.status} onChange={(e) => handleRowChange(index, e)} required>
-                    <option value="A Pagar">A Pagar</option>
-                    <option value="Pago">Pago</option>
-                </select>
-            </div>
-
-            {!transactionToEdit && (
-                <div>
-                    <label>Remover</label>
-                    <button type="button" onClick={() => removeRow(index)} className="btn" style={{ backgroundColor: 'var(--cor-erro)', width: '100%' }}>
-                        ✖ Remover
-                    </button>
-                </div>
-            )}
-        </div>
-    );
-})}
-
+                            const total = (row.quantity || 0) * (row.unit_price || 0);
+                            return (
+                                <div key={index} className="transaction-modal-row" style={{ gridTemplateColumns: gridColumns }}>
+                                    <select name="employee_id" value={row.employee_id} onChange={(e) => handleRowChange(index, e)} required disabled={!!defaultEmployeeId && !transactionToEdit}>
+                                        <option value="" disabled>Selecione...</option>
+                                        {funcionarios.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
+                                    </select>
+                                    <input name="transaction_date" type="date" value={row.transaction_date} onChange={(e) => handleRowChange(index, e)} required />
+                                    <input name="quantity" type="number" placeholder="Qtd" step="0.01" value={row.quantity} onChange={(e) => handleRowChange(index, e)} required />
+                                    <input name="description" placeholder={tipo === 'venda' ? 'Digite o produto' : 'Digite a compra'} value={row.description} onChange={(e) => handleRowChange(index, e)} onBlur={() => handleDescriptionBlur(index)} list="description-list" required />
+                                    <input name="category" placeholder={tipo === 'venda' ? 'Selecione o comprador' : 'Selecione o fornecedor'} value={row.category} onChange={(e) => handleRowChange(index, e)} onBlur={() => handleDescriptionBlur(index)} list="category-list" />
+                                    <input type="text" name="unit_price" placeholder="R$ 0,00" value={formatCurrency(row.unit_price)} onChange={(e) => handleRowChange(index, e)} required />
+                                    <input name="total" placeholder="Total" value={formatCurrency(total)} disabled style={{ backgroundColor: 'var(--cor-borda)' }} />
+                                    <select name="status" value={row.status} onChange={(e) => handleRowChange(index, e)} required>
+                                        <option value="A Pagar">A Pagar</option>
+                                        <option value="Pago">Pago</option>
+                                    </select>
+                                    {!transactionToEdit && (
+                                        <button type="button" onClick={() => removeRow(index)} className="btn" style={{ backgroundColor: 'transparent', color: 'var(--cor-erro)', padding: '5px', width: 'auto', border: 'none' }}>✖</button>
+                                    )}
+                                </div>
+                            );
+                        })}
                     </div>
                     
-                    {tipo === 'gasto' && (
+                    {tipo === 'gasto' && !transactionToEdit && (
                          <div className="input-group" style={{marginTop: '15px'}}>
-                            <label>{transactionToEdit && transactionToEdit.attachment_id ? 'Substituir Anexo (Opcional)' : 'Anexo (Opcional)'}</label>
+                            <label>Anexo (Opcional, apenas para o primeiro da lista)</label>
                             <input type="file" name="attachment" onChange={handleFileChange} />
                         </div>
                     )}
