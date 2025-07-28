@@ -249,7 +249,7 @@ exports.generateReport = async (req, res) => {
         }
 
         const html = `
-            <!DOCTYPE html><html><head><meta charset="UTF-8"><title>Relatório de Fechamento</title><style>body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; margin: 20px;} .header{display:flex; align-items:center; border-bottom: 2px solid #ccc; padding-bottom:10px; margin-bottom: 20px;} .header img{max-width:100px; max-height:100px; margin-right:20px;} table{width:100%;border-collapse:collapse;margin-top:20px;font-size:12px}th,td{border:1px solid #ccc;padding:8px;text-align:left}th{background-color:#f2f2f2}.resumo{margin-top:20px;padding:15px;border:1px solid #ccc;background:#f9f9f9}@media print{.no-print{display:none}}</style></head>
+            <!DOCTYPE html><html><head><meta charset="UTF-8"><title>Relatório de Fechamento</title><style>body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; margin: 20px;} .header{display:flex; align-items:center; border-bottom: 2px solid #ccc; padding-bottom:10px; margin-bottom: 20px;} .header img{max-width:100px; max-height:100px; margin-right:20px; object-fit: contain;} table{width:100%;border-collapse:collapse;margin-top:20px;font-size:12px}th,td{border:1px solid #ccc;padding:8px;text-align:left}th{background-color:#f2f2f2}.resumo{margin-top:20px;padding:15px;border:1px solid #ccc;background:#f9f9f9}@media print{.no-print{display:none}}</style></head>
             <body>
                 <div class="header">
                     ${profile.logo_path ? `<img src="${process.env.BACKEND_URL}/${profile.logo_path.replace(/\\/g, '/')}" alt="Logo">` : ''}
