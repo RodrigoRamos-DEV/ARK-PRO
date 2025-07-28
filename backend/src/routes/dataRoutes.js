@@ -5,6 +5,10 @@ const authMiddleware = require('../middleware/authMiddleware');
 
 router.use(authMiddleware);
 
+// --- NOVAS ROTAS PARA O PERFIL ---
+router.get('/profile', dataController.getProfile);
+router.put('/profile', dataController.updateProfile);
+
 // Rotas de Funcionários
 router.get('/employees', dataController.getEmployees);
 router.post('/employees', dataController.addEmployee);

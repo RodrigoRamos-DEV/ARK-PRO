@@ -11,10 +11,12 @@ const ensureAdmin = (req, res, next) => {
 
 const getAllClients = async (req, res) => {
     try {
+        // --- CORREÇÃO AQUI ---
+        // Trocado "c.telefone" por "c.business_phone"
         const query = `
             SELECT 
                 c.id, c.company_name, c.razao_social, c.cnpj, c.inscricao_estadual,
-                c.inscricao_municipal, c.responsavel_nome, c.telefone,
+                c.inscricao_municipal, c.responsavel_nome, c.business_phone, c.contact_phone,
                 c.endereco_logradouro, c.endereco_numero, c.endereco_bairro,
                 c.endereco_cidade, c.endereco_uf, c.endereco_cep,
                 c.regime_tributario,
@@ -44,7 +46,6 @@ const createClient = async (req, res) => {
         regime_tributario, licenseExpiresAt
     } = req.body;
 
-    // --- ALTERAÇÃO AQUI: CNPJ foi removido da lista de campos obrigatórios ---
     if (!companyName || !licenseExpiresAt || !razao_social || !responsavel_nome || !telefone) {
         return res.status(400).json({ error: 'Nome da empresa, Razão Social, Responsável, Telefone e Data de Vencimento são obrigatórios.' });
     }
@@ -53,10 +54,12 @@ const createClient = async (req, res) => {
     try {
         await client.query('BEGIN');
 
+        // --- CORREÇÃO AQUI ---
+        // Garante que o valor da variável "telefone" (do formulário) é inserido na coluna "business_phone"
         const newClientResult = await client.query(
             `INSERT INTO clients (
                 company_name, razao_social, cnpj, inscricao_estadual, inscricao_municipal,
-                responsavel_nome, telefone, endereco_logradouro, endereco_numero,
+                responsavel_nome, business_phone, endereco_logradouro, endereco_numero,
                 endereco_bairro, endereco_cidade, endereco_uf, endereco_cep,
                 regime_tributario, license_expires_at, license_status
             ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, 'Ativo') RETURNING id`,
@@ -103,10 +106,12 @@ const updateClient = async (req, res) => {
         regime_tributario, licenseStatus, licenseExpiresAt
     } = req.body;
     try {
+        // --- CORREÇÃO AQUI ---
+        // Garante que o valor da variável "telefone" é atualizado na coluna "business_phone"
         const result = await db.query(
             `UPDATE clients SET 
                 company_name = $1, razao_social = $2, cnpj = $3, inscricao_estadual = $4, 
-                inscricao_municipal = $5, responsavel_nome = $6, telefone = $7, 
+                inscricao_municipal = $5, responsavel_nome = $6, business_phone = $7, 
                 endereco_logradouro = $8, endereco_numero = $9, endereco_bairro = $10, 
                 endereco_cidade = $11, endereco_uf = $12, endereco_cep = $13, 
                 regime_tributario = $14, license_status = $15, license_expires_at = $16 
@@ -183,6 +188,26 @@ const getDashboardStats = async (req, res) => {
     }
 };
 
+const saveReportTemplate = async (req, res) => {
+    const { name, clientId, templateJson, templateHtml } = req.body;
+
+    if (!name || !templateJson || !templateHtml) {
+        return res.status(400).json({ error: "Nome, JSON e HTML do template são obrigatórios." });
+    }
+
+    try {
+        await db.query(
+            `INSERT INTO report_templates (name, client_id, template_json, template_html)
+             VALUES ($1, $2, $3, $4)`,
+            [name, clientId || null, templateJson, templateHtml]
+        );
+        res.status(201).json({ msg: 'Template salvo com sucesso!' });
+    } catch (err) {
+        console.error(err.message);
+        res.status(500).json({ error: 'Erro no servidor ao salvar o template.' });
+    }
+};
+
 module.exports = {
     ensureAdmin,
     getAllClients,
@@ -190,5 +215,6 @@ module.exports = {
     updateClient,
     deleteClient,
     renewClientLicense,
-    getDashboardStats
+    getDashboardStats,
+    saveReportTemplate
 };

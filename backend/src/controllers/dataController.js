@@ -2,6 +2,7 @@ const db = require('../config/db');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const handlebars = require('handlebars');
 
 const storage = multer.diskStorage({
     destination: function (req, file, cb) {
@@ -178,68 +179,108 @@ exports.batchDeleteTransactions = async (req, res) => {
 };
 
 exports.generateReport = async (req, res) => {
+    const clientId = req.user.clientId;
     const { filteredData, summary, filters, viewType, employeeName } = req.body;
-    const formatCurrency = (value) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value || 0);
-    const formatDate = (dateString) => {
-        if (!dateString) return '';
-        const date = new Date(dateString);
-        const userTimezoneOffset = date.getTimezoneOffset() * 60000;
-        return new Date(date.getTime() + userTimezoneOffset).toLocaleDateString('pt-BR');
-    };
-    let title = "Relatório de Fechamento";
-    let subtitle = "";
-    const isCompradorEspecifico = viewType === 'vendas' && filters.buyer !== 'todos';
-    const isFornecedorEspecifico = viewType === 'gastos' && filters.supplier !== 'todos';
-    const isFuncionarioEspecifico = filters.employeeId !== 'todos';
-    if (isCompradorEspecifico) {
-        title = "Relatório de Fechamento - Venda";
-        subtitle = `<h1 style="font-size: 2.2em; margin: 10px 0;">${filters.buyer.toUpperCase()}</h1>`;
-    } else if (isFornecedorEspecifico) {
-        title = "Relatório de Fechamento - Compra";
-        subtitle = `<h1 style="font-size: 2.2em; margin: 10px 0;">${filters.supplier.toUpperCase()}</h1>`;
-    } else if (isFuncionarioEspecifico) {
-        subtitle = `<h1 style="font-size: 2.2em; margin: 10px 0;">${employeeName.toUpperCase()}</h1>`;
-        if (viewType === 'vendas') title = "Relatório de Fechamento - Venda";
-        else if (viewType === 'gastos') title = "Relatório de Fechamento - Compra";
-    } else {
-        title = "Relatório de Fechamento - Geral";
+    
+    try {
+        const clientInfo = await db.query('SELECT company_name, logo_path, contact_phone, full_address FROM clients WHERE id = $1', [clientId]);
+        const profile = clientInfo.rows[0] || {};
+        
+        const formatCurrency = (value) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value || 0);
+        const formatQuantity = (value) => new Intl.NumberFormat('pt-BR').format(value || 0);
+        const formatDate = (dateString) => {
+            if (!dateString) return '';
+            const date = new Date(dateString);
+            return new Date(date.getTime() + (date.getTimezoneOffset() * 60000)).toLocaleDateString('pt-BR');
+        };
+
+        let title = "Relatório de Fechamento";
+        let subtitle = "";
+        const isCompradorEspecifico = viewType === 'vendas' && filters.buyer !== 'todos';
+        const isFornecedorEspecifico = viewType === 'gastos' && filters.supplier !== 'todos';
+        const isFuncionarioEspecifico = filters.employeeId !== 'todos';
+
+        if (isCompradorEspecifico) {
+            title = "Relatório de Fechamento - Venda";
+            subtitle = `<h2 style="font-size: 1.5em; margin: 10px 0;">Comprador: ${filters.buyer.toUpperCase()}</h2>`;
+        } else if (isFornecedorEspecifico) {
+            title = "Relatório de Fechamento - Compra";
+            subtitle = `<h2 style="font-size: 1.5em; margin: 10px 0;">Fornecedor: ${filters.supplier.toUpperCase()}</h2>`;
+        } else if (isFuncionarioEspecifico) {
+            subtitle = `<h2 style="font-size: 1.5em; margin: 10px 0;">Funcionário: ${employeeName.toUpperCase()}</h2>`;
+            if (viewType === 'vendas') title = "Relatório de Fechamento - Venda";
+            else if (viewType === 'gastos') title = "Relatório de Fechamento - Compra";
+        } else {
+            title = "Relatório de Fechamento - Geral";
+        }
+
+        let finalTableHeaders = [];
+        let tableRows = '';
+
+        if (isCompradorEspecifico || isFornecedorEspecifico) {
+            finalTableHeaders = ['Data', 'Quantidade', viewType === 'vendas' ? 'Produto' : 'Compra', 'Valor Unitário', 'Valor Total', 'Status'];
+            tableRows = filteredData.map(item => `
+                <tr>
+                    <td>${formatDate(item.transaction_date)}</td>
+                    <td>${formatQuantity(item.quantity)}</td>
+                    <td>${item.description || ''}</td>
+                    <td>${formatCurrency(item.unit_price)}</td>
+                    <td style="color:${item.type === 'venda' ? 'green' : 'red'};">${formatCurrency(item.total_price)}</td>
+                    <td>${item.status || ''}</td>
+                </tr>
+            `).join('');
+        } else {
+            finalTableHeaders = ['Data', 'Funcionário', 'Quantidade', 'Produto/Compra', 'Valor Unitário', 'Valor Total', 'Comprador/Forn.', 'Status'];
+            if (isFuncionarioEspecifico) {
+                finalTableHeaders = finalTableHeaders.filter(h => h !== 'Funcionário');
+            }
+            tableRows = filteredData.map(item => `
+                <tr>
+                    <td>${formatDate(item.transaction_date)}</td>
+                    ${!isFuncionarioEspecifico ? `<td>${item.employee_name || ''}</td>` : ''}
+                    <td>${formatQuantity(item.quantity)}</td>
+                    <td>${item.description || ''}</td>
+                    <td>${formatCurrency(item.unit_price)}</td>
+                    <td style="color:${item.type === 'venda' ? 'green' : 'red'};">${formatCurrency(item.total_price)}</td>
+                    <td>${item.category || ''}</td>
+                    <td>${item.status || ''}</td>
+                </tr>
+            `).join('');
+        }
+
+        const html = `
+            <!DOCTYPE html><html><head><meta charset="UTF-8"><title>Relatório de Fechamento</title><style>body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; margin: 20px;} .header{display:flex; align-items:center; border-bottom: 2px solid #ccc; padding-bottom:10px; margin-bottom: 20px;} .header img{max-width:100px; max-height:100px; margin-right:20px;} table{width:100%;border-collapse:collapse;margin-top:20px;font-size:12px}th,td{border:1px solid #ccc;padding:8px;text-align:left}th{background-color:#f2f2f2}.resumo{margin-top:20px;padding:15px;border:1px solid #ccc;background:#f9f9f9}@media print{.no-print{display:none}}</style></head>
+            <body>
+                <div class="header">
+                    ${profile.logo_path ? `<img src="${process.env.BACKEND_URL}/${profile.logo_path.replace(/\\/g, '/')}" alt="Logo">` : ''}
+                    <div>
+                        <h1 style="margin:0;">${profile.company_name || req.user.companyName}</h1>
+                        <p style="margin:0;">${profile.full_address || ''}</p>
+                        <p style="margin:0;">${profile.contact_phone || ''}</p>
+                    </div>
+                </div>
+                <h2>${title}</h2>
+                ${subtitle}
+                <p><strong>Período:</strong> ${formatDate(filters.startDate)} a ${formatDate(filters.endDate)}</p>
+                <button class="no-print" onclick="window.print()">Imprimir / Salvar PDF</button>
+                <table>
+                    <thead><tr>${finalTableHeaders.map(h => `<th>${h}</th>`).join('')}</tr></thead>
+                    <tbody>${tableRows}</tbody>
+                </table>
+                <div class="resumo">
+                    <h2>Resumo Financeiro</h2>
+                    <p><strong>Total Ganhos:</strong> ${formatCurrency(summary.ganhos)}</p>
+                    <p><strong>Total Gastos:</strong> ${formatCurrency(summary.gastos)}</p>
+                    <hr>
+                    <p><strong>Saldo Final:</strong> ${formatCurrency(summary.saldo)}</p>
+                </div>
+            </body></html>
+        `;
+        res.send(html);
+    } catch (err) {
+        console.error(err.message);
+        res.status(500).send("<h1>Erro interno ao gerar o relatório.</h1>");
     }
-    const includeFuncionario = !isFuncionarioEspecifico;
-    const finalTableHeaders = includeFuncionario
-        ? ['Data', 'Funcionário', 'Tipo', 'Descrição', 'Comprador/Forn.', 'Total', 'Status']
-        : ['Data', 'Tipo', 'Descrição', 'Comprador/Forn.', 'Total', 'Status'];
-    const tableRows = filteredData.map(item => `
-        <tr>
-            <td>${formatDate(item.transaction_date)}</td>
-            ${includeFuncionario ? `<td>${item.employee_name || ''}</td>` : ''}
-            <td style="text-transform: capitalize;">${item.type}</td>
-            <td>${item.description || ''}</td>
-            <td>${item.category || ''}</td>
-            <td style="color:${item.type === 'venda' ? 'green' : 'red'};">${formatCurrency(item.total_price)}</td>
-            <td>${item.status || ''}</td>
-        </tr>
-    `).join('');
-    const html = `
-        <!DOCTYPE html><html><head><meta charset="UTF-8"><title>Relatório de Fechamento</title><style>body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}table{width:100%;border-collapse:collapse;margin-top:20px;font-size:12px}th,td{border:1px solid #ccc;padding:8px;text-align:left}th{background-color:#f2f2f2}.resumo{margin-top:20px;padding:15px;border:1px solid #ccc;background:#f9f9f9}@media print{.no-print{display:none}}</style></head>
-        <body>
-            <h1>${title}</h1>
-            ${subtitle}
-            <p><strong>Período:</strong> ${formatDate(filters.startDate)} a ${formatDate(filters.endDate)}</p>
-            <button class="no-print" onclick="window.print()">Imprimir / Salvar PDF</button>
-            <table>
-                <thead><tr>${finalTableHeaders.map(h => `<th>${h}</th>`).join('')}</tr></thead>
-                <tbody>${tableRows}</tbody>
-            </table>
-            <div class="resumo">
-                <h2>Resumo Financeiro</h2>
-                <p><strong>Total Ganhos:</strong> ${formatCurrency(summary.ganhos)}</p>
-                <p><strong>Total Gastos:</strong> ${formatCurrency(summary.gastos)}</p>
-                <hr>
-                <p><strong>Saldo Final:</strong> ${formatCurrency(summary.saldo)}</p>
-            </div>
-        </body></html>
-    `;
-    res.send(html);
 };
 
 exports.addAttachment = async (req, res) => {
@@ -279,4 +320,75 @@ exports.deleteAttachment = async (req, res) => {
         console.error(err.message);
         res.status(500).json({ error: 'Erro no servidor ao excluir o anexo.' });
     }
+};
+
+exports.getProfile = async (req, res) => {
+    try {
+        const result = await db.query(
+            'SELECT company_name, logo_path, contact_phone, full_address FROM clients WHERE id = $1',
+            [req.user.clientId]
+        );
+        if (result.rowCount === 0) {
+            return res.status(404).json({ error: 'Perfil do cliente não encontrado.' });
+        }
+        res.json(result.rows[0]);
+    } catch (err) {
+        console.error(err.message);
+        res.status(500).json({ error: 'Erro no servidor ao buscar perfil.' });
+    }
+};
+
+exports.updateProfile = (req, res) => {
+    upload.single('logo')(req, res, async function (err) {
+        if (err) {
+            return res.status(500).json({ error: "Erro no upload do logo." });
+        }
+
+        const { companyName, contactPhone, fullAddress } = req.body;
+        const clientId = req.user.clientId;
+        let logoPath = null;
+        if (req.file) {
+            logoPath = req.file.path;
+        }
+
+        try {
+            const fieldsToUpdate = [];
+            const values = [];
+            let queryIndex = 1;
+
+            if (companyName) {
+                fieldsToUpdate.push(`company_name = $${queryIndex++}`);
+                values.push(companyName);
+            }
+            if (contactPhone) {
+                fieldsToUpdate.push(`contact_phone = $${queryIndex++}`);
+                values.push(contactPhone);
+            }
+            if (fullAddress) {
+                fieldsToUpdate.push(`full_address = $${queryIndex++}`);
+                values.push(fullAddress);
+            }
+            if (logoPath) {
+                fieldsToUpdate.push(`logo_path = $${queryIndex++}`);
+                values.push(logoPath);
+            }
+
+            if (fieldsToUpdate.length === 0) {
+                return res.status(400).json({ error: "Nenhum dado para atualizar." });
+            }
+
+            values.push(clientId);
+            
+            const queryText = `UPDATE clients SET ${fieldsToUpdate.join(', ')} WHERE id = $${queryIndex} RETURNING *`;
+            
+            const result = await db.query(queryText, values);
+
+            res.json({ msg: 'Perfil atualizado com sucesso!', updatedProfile: result.rows[0] });
+
+        } catch (dbErr) {
+            console.error(dbErr.message);
+            if (logoPath) { fs.unlinkSync(logoPath); }
+            res.status(500).json({ error: 'Erro ao atualizar o perfil na base de dados.' });
+        }
+    });
 };

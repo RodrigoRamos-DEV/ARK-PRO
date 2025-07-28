@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 
-// Componente para o aviso de Vencimento Próximo
 const ExpiryWarning = ({ daysLeft }) => (
     <div className="expiry-warning">
         {daysLeft > 1 && `A sua licença expira em ${daysLeft} dias.`}
@@ -10,7 +9,6 @@ const ExpiryWarning = ({ daysLeft }) => (
     </div>
 );
 
-// Componente para o overlay de Licença Expirada
 const ExpiryOverlay = () => (
     <div className="expiry-overlay">
         <div className="expiry-overlay-content">
@@ -20,16 +18,12 @@ const ExpiryOverlay = () => (
     </div>
 );
 
-
 function MainLayout({ theme, toggleTheme, isAdmin = false }) {
     const navigate = useNavigate();
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-    
-    // --- NOVO ESTADO PARA CONTROLAR O AVISO DE VENCIMENTO ---
     const [licenseStatus, setLicenseStatus] = useState({ status: 'active', daysLeft: null });
 
     useEffect(() => {
-        // Apenas clientes (não admins) têm verificação de licença
         if (isAdmin) {
             setLicenseStatus({ status: 'active', daysLeft: null });
             return;
@@ -40,7 +34,6 @@ function MainLayout({ theme, toggleTheme, isAdmin = false }) {
             const today = new Date();
             const expiryDate = new Date(user.licenseExpiresAt);
             
-            // Zera a hora para comparar apenas as datas
             today.setHours(0, 0, 0, 0);
             expiryDate.setHours(0, 0, 0, 0);
 
@@ -81,6 +74,7 @@ function MainLayout({ theme, toggleTheme, isAdmin = false }) {
                         <NavLink to="/dashboard" className={({ isActive }) => (isActive ? 'active' : '')} onClick={closeMobileMenu}>Controle Financeiro</NavLink>
                         <NavLink to="/lancamentos" className={({ isActive }) => (isActive ? 'active' : '')} onClick={closeMobileMenu}>Lançamentos</NavLink>
                         <NavLink to="/cadastro" className={({ isActive }) => (isActive ? 'active' : '')} onClick={closeMobileMenu}>Cadastro</NavLink>
+                        <NavLink to="/profile" className={({ isActive }) => (isActive ? 'active' : '')} onClick={closeMobileMenu}>Perfil</NavLink>
                     </div>
                 )}
 
@@ -89,6 +83,7 @@ function MainLayout({ theme, toggleTheme, isAdmin = false }) {
                         {theme === 'light' ? '🌙' : '☀️'}
                     </button>
                     <button onClick={handleLogout} className="nav-button logout">Sair</button>
+                    
                     {!isAdmin && (
                         <button className="nav-button mobile-menu-icon" onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}>
                             {isMobileMenuOpen ? '✖' : '☰'}
@@ -97,18 +92,15 @@ function MainLayout({ theme, toggleTheme, isAdmin = false }) {
                 </div>
             </nav>
 
-            {/* Renderização Condicional do Conteúdo */}
             {licenseStatus.status === 'expired' ? (
                 <ExpiryOverlay />
             ) : (
-                <>
-                    <main className="container">
-                        <Outlet />
-                    </main>
+                <main className="container">
+                    <Outlet />
                     {licenseStatus.status === 'warning' && (
                         <ExpiryWarning daysLeft={licenseStatus.daysLeft} />
                     )}
-                </>
+                </main>
             )}
         </div>
     );
