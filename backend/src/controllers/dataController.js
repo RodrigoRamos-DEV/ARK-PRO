@@ -357,6 +357,16 @@ exports.updateProfile = (req, res) => {
         }
 
         try {
+            // Lógica para apagar o logo antigo se um novo for enviado
+            if (logoPath) {
+                const oldProfile = await db.query('SELECT logo_path FROM clients WHERE id = $1', [clientId]);
+                if (oldProfile.rows[0] && oldProfile.rows[0].logo_path) {
+                    if (fs.existsSync(oldProfile.rows[0].logo_path)) {
+                        fs.unlinkSync(oldProfile.rows[0].logo_path);
+                    }
+                }
+            }
+            
             const fieldsToUpdate = [];
             const values = [];
             let queryIndex = 1;
