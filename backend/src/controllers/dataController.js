@@ -247,17 +247,22 @@ exports.generateReport = async (req, res) => {
                 </tr>
             `).join('');
         }
+        
+        const logoUrl = profile.logo_path ? `${process.env.BACKEND_URL}/${profile.logo_path.replace(/\\/g, '/')}` : '';
 
         const html = `
-            <!DOCTYPE html><html><head><meta charset="UTF-8"><title>Relatório de Fechamento</title><style>body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; margin: 20px;} .header{display:flex; align-items:center; border-bottom: 2px solid #ccc; padding-bottom:10px; margin-bottom: 20px;} .header img{max-width:100px; max-height:100px; margin-right:20px; object-fit: contain;} table{width:100%;border-collapse:collapse;margin-top:20px;font-size:12px}th,td{border:1px solid #ccc;padding:8px;text-align:left}th{background-color:#f2f2f2}.resumo{margin-top:20px;padding:15px;border:1px solid #ccc;background:#f9f9f9}@media print{.no-print{display:none}}</style></head>
+            <!DOCTYPE html><html><head><meta charset="UTF-8"><title>Relatório de Fechamento</title><style>body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; margin: 20px;} .header{display:flex; justify-content: space-between; align-items:center; border-bottom: 2px solid #ccc; padding-bottom:10px; margin-bottom: 20px;} .header-logo{flex: 1; text-align: left;} .header-logo img{max-width:120px; max-height:100px; object-fit: contain;} .header-center{flex: 2; text-align: center;} .header-placeholder{flex: 1;} table{width:100%;border-collapse:collapse;margin-top:20px;font-size:12px}th,td{border:1px solid #ccc;padding:8px;text-align:left}th{background-color:#f2f2f2}.resumo{margin-top:20px;padding:15px;border:1px solid #ccc;background:#f9f9f9}@media print{.no-print{display:none}}</style></head>
             <body>
                 <div class="header">
-                    ${profile.logo_path ? `<img src="${process.env.BACKEND_URL}/${profile.logo_path.replace(/\\/g, '/')}" alt="Logo">` : ''}
-                    <div>
-                        <h1 style="margin:0;">${profile.company_name || req.user.companyName}</h1>
+                    <div class="header-logo">
+                        ${profile.logo_path ? `<img src="${logoUrl}" alt="Logo">` : ''}
+                    </div>
+                    <div class="header-center">
+                        <h1 style="margin:0; font-size: 1.8em;">${profile.company_name || req.user.companyName}</h1>
                         <p style="margin:0;">${profile.full_address || ''}</p>
                         <p style="margin:0;">${profile.contact_phone || ''}</p>
                     </div>
+                    <div class="header-placeholder"></div>
                 </div>
                 <h2>${title}</h2>
                 ${subtitle}
