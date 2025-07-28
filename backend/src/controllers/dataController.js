@@ -194,6 +194,9 @@ exports.generateReport = async (req, res) => {
             return new Date(date.getTime() + (date.getTimezoneOffset() * 60000)).toLocaleDateString('pt-BR');
         };
 
+        // --- CORREÇÃO AQUI: Ordena os dados por data antes de gerar a tabela ---
+        filteredData.sort((a, b) => new Date(a.transaction_date) - new Date(b.transaction_date));
+
         let title = "Relatório de Fechamento";
         let subtitle = "";
         const isCompradorEspecifico = viewType === 'vendas' && filters.buyer !== 'todos';
