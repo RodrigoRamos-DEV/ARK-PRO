@@ -15,7 +15,8 @@ import ControleFinanceiroPage from './components/ControleFinanceiroPage';
 import CadastroPage from './components/CadastroPage';
 import LancamentosPage from './components/LancamentosPage';
 import AdminPage from './components/AdminPage';
-import ProfilePage from './components/ProfilePage'; // <-- IMPORTA A NOVA PÁGINA
+import ProfilePage from './components/ProfilePage';
+import AdminPartnersPage from './components/AdminPartnersPage'; // <-- IMPORTA A NOVA PÁGINA
 
 function App() {
   const [theme, setTheme] = useState(localStorage.getItem('theme') || 'light');
@@ -56,13 +57,15 @@ function App() {
             <Route path="/dashboard" element={<ControleFinanceiroPage />} />
             <Route path="/cadastro" element={<CadastroPage />} />
             <Route path="/lancamentos" element={<LancamentosPage />} />
-            <Route path="/profile" element={<ProfilePage />} /> {/* <-- ADICIONA A NOVA ROTA */}
+            <Route path="/profile" element={<ProfilePage />} />
           </Route>
         </Route>
         
         <Route element={<AdminProtectedRoute />}>
             <Route element={<MainLayout theme={theme} toggleTheme={toggleTheme} isAdmin />}>
               <Route path="/admin" element={<AdminPage />} />
+              {/* --- ROTA ADICIONADA AQUI --- */}
+              <Route path="/admin/partners" element={<AdminPartnersPage />} />
             </Route>
         </Route>
 

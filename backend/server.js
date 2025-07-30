@@ -7,6 +7,7 @@ const path = require('path');
 const authRoutes = require('./src/routes/authRoutes');
 const adminRoutes = require('./src/routes/adminRoutes');
 const dataRoutes = require('./src/routes/dataRoutes');
+const partnerRoutes = require('./src/routes/partnerRoutes'); // <-- ADICIONADO
 
 const app = express();
 
@@ -22,6 +23,7 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/data', dataRoutes);
+app.use('/api/partners', partnerRoutes); // <-- ADICIONADO
 
 
 app.get('/', (req, res) => {

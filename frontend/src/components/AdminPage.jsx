@@ -39,17 +39,15 @@ function AdminPage() {
     const [newToken, setNewToken] = useState('');
     const [dashboardData, setDashboardData] = useState(null);
 
-    // ANTES: const API_URL = 'http://localhost:3000/api/admin'; (Removido)
-    const ADMIN_API_URL = `${API_URL}/api/admin`; // <-- CORRIGIDO: Usa a URL importada
+    const ADMIN_API_URL = `${API_URL}/api/admin`;
     const token = localStorage.getItem('token');
 
     const fetchData = async () => {
         setLoading(true);
        try {
             const [clientsResponse, dashboardResponse] = await Promise.all([
-                // ANTES: axios.get(`${API_URL}/api/admin/clients`, ...)
-                axios.get(`${ADMIN_API_URL}/clients`, { headers: { 'x-auth-token': token } }), // <-- CORRIGIDO
-                axios.get(`${ADMIN_API_URL}/dashboard`, { headers: { 'x-auth-token': token } }) // <-- CORRIGIDO
+                axios.get(`${ADMIN_API_URL}/clients`, { headers: { 'x-auth-token': token } }),
+                axios.get(`${ADMIN_API_URL}/dashboard`, { headers: { 'x-auth-token': token } })
             ]);
             setClients(clientsResponse.data);
             setDashboardData(dashboardResponse.data);
@@ -64,22 +62,13 @@ function AdminPage() {
         fetchData();
     }, []);
 
-    const handleSaveClient = async (formData, clientId) => {
-        try {
-            if (clientId) {
-                await axios.put(`${ADMIN_API_URL}/clients/${clientId}`, formData, { headers: { 'x-auth-token': token } }); // <-- CORRIGIDO
-                toast.success("Cliente atualizado com sucesso!");
-            } else {
-                const response = await axios.post(`${ADMIN_API_URL}/clients`, formData, { headers: { 'x-auth-token': token } }); // <-- CORRIGIDO
-                toast.success("Cliente criado com sucesso! Token gerado.");
-                setNewToken(response.data.registrationToken);
-            }
-            fetchData();
-            setIsModalOpen(false);
-            setEditingClient(null);
-        } catch (error) {
-            toast.error(error.response?.data?.error || "Erro ao salvar cliente.");
+    const handleSaveClient = (formData, clientId, registrationToken) => {
+        if (registrationToken) {
+            setNewToken(registrationToken);
         }
+        fetchData();
+        setIsModalOpen(false);
+        setEditingClient(null);
     };
 
     const handleDeleteClient = (client) => {
@@ -88,7 +77,7 @@ function AdminPage() {
             message: `Tem certeza que deseja excluir o cliente "${client.company_name}"? Todos os seus dados (usuários, lançamentos, etc.) serão perdidos permanentemente.`,
             onConfirm: async () => {
                 try {
-                    await axios.delete(`${ADMIN_API_URL}/clients/${client.id}`, { headers: { 'x-auth-token': token } }); // <-- CORRIGIDO
+                    await axios.delete(`${ADMIN_API_URL}/clients/${client.id}`, { headers: { 'x-auth-token': token } });
                     toast.success("Cliente excluído com sucesso!");
                     fetchData();
                     closeConfirmModal();
@@ -106,7 +95,7 @@ function AdminPage() {
             message: `Deseja marcar o pagamento como recebido e renovar a licença de "${client.company_name}" por mais 30 dias?`,
             onConfirm: async () => {
                 try {
-                    await axios.put(`${ADMIN_API_URL}/clients/${client.id}/renew`, {}, { headers: { 'x-auth-token': token } }); // <-- CORRIGIDO
+                    await axios.put(`${ADMIN_API_URL}/clients/${client.id}/renew`, {}, { headers: { 'x-auth-token': token } });
                     toast.success("Licença renovada com sucesso!");
                     fetchData();
                     closeConfirmModal();
@@ -164,9 +153,15 @@ function AdminPage() {
                 </div>
             )}
 
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '10px' }}>
                 <h2>Painel do Administrador</h2>
-                <button className="btn" style={{ width: 'auto' }} onClick={() => handleOpenModal()}>+ Novo Cliente</button>
+                {/* --- BOTÃO ADICIONADO AQUI --- */}
+                <div style={{display: 'flex', gap: '10px', flexWrap: 'wrap'}}>
+                    <Link to="/admin/partners" className="btn" style={{ width: 'auto', backgroundColor: 'var(--cor-destaque)'}}>
+                        Controle de Sócios
+                    </Link>
+                    <button className="btn" style={{ width: 'auto' }} onClick={() => handleOpenModal()}>+ Novo Cliente</button>
+                </div>
             </div>
 
             {loading ? <p>A carregar dashboard...</p> : dashboardData && (

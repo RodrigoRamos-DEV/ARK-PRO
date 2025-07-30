@@ -194,7 +194,6 @@ exports.generateReport = async (req, res) => {
             return new Date(date.getTime() + (date.getTimezoneOffset() * 60000)).toLocaleDateString('pt-BR');
         };
 
-        // --- CORREÇÃO AQUI: Ordena os dados por data antes de gerar a tabela ---
         filteredData.sort((a, b) => new Date(a.transaction_date) - new Date(b.transaction_date));
 
         let title = "Relatório de Fechamento";
@@ -360,7 +359,6 @@ exports.updateProfile = (req, res) => {
         }
 
         try {
-            // Lógica para apagar o logo antigo se um novo for enviado
             if (logoPath) {
                 const oldProfile = await db.query('SELECT logo_path FROM clients WHERE id = $1', [clientId]);
                 if (oldProfile.rows[0] && oldProfile.rows[0].logo_path) {
@@ -391,18 +389,23 @@ exports.updateProfile = (req, res) => {
                 values.push(logoPath);
             }
 
-            if (fieldsToUpdate.length === 0) {
-                return res.status(400).json({ error: "Nenhum dado para atualizar." });
+            if (fieldsToUpdate.length === 0 && !logoPath) {
+                // Se nenhum campo de texto foi alterado E nenhum ficheiro foi enviado, não faz nada.
+                return res.json({ msg: 'Nenhum dado para atualizar.' });
             }
 
-            values.push(clientId);
+            // Se apenas o logo foi enviado mas nenhum outro campo de texto
+            if (fieldsToUpdate.length > 0) {
+                 values.push(clientId);
+                const queryText = `UPDATE clients SET ${fieldsToUpdate.join(', ')} WHERE id = $${queryIndex} RETURNING *`;
+                const result = await db.query(queryText, values);
+                return res.json({ msg: 'Perfil atualizado com sucesso!', updatedProfile: result.rows[0] });
+            } else if (logoPath) {
+                // Caso especial onde SÓ o logo é atualizado
+                 const result = await db.query('UPDATE clients SET logo_path = $1 WHERE id = $2 RETURNING *', [logoPath, clientId]);
+                 return res.json({ msg: 'Perfil atualizado com sucesso!', updatedProfile: result.rows[0] });
+            }
             
-            const queryText = `UPDATE clients SET ${fieldsToUpdate.join(', ')} WHERE id = $${queryIndex} RETURNING *`;
-            
-            const result = await db.query(queryText, values);
-
-            res.json({ msg: 'Perfil atualizado com sucesso!', updatedProfile: result.rows[0] });
-
         } catch (dbErr) {
             console.error(dbErr.message);
             if (logoPath) { fs.unlinkSync(logoPath); }

@@ -35,7 +35,9 @@ function ClientModal({ isOpen, onClose, onSave, clientToEdit }) {
                     inscricao_estadual: clientToEdit.inscricao_estadual || '',
                     inscricao_municipal: clientToEdit.inscricao_municipal || '',
                     responsavel_nome: clientToEdit.responsavel_nome || '',
-                    telefone: clientToEdit.telefone || '',
+                    // --- CORREÇÃO AQUI ---
+                    // Lê da coluna 'business_phone' que vem do backend
+                    telefone: clientToEdit.business_phone || '',
                     endereco_logradouro: clientToEdit.endereco_logradouro || '',
                     endereco_numero: clientToEdit.endereco_numero || '',
                     endereco_bairro: clientToEdit.endereco_bairro || '',
@@ -77,22 +79,9 @@ function ClientModal({ isOpen, onClose, onSave, clientToEdit }) {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        const token = localStorage.getItem('token');
-        const ADMIN_API_URL = `${API_URL}/api/admin/clients`;
-
-        try {
-            if (isEditMode) {
-                await axios.put(`${ADMIN_API_URL}/${clientToEdit.id}`, formData, { headers: { 'x-auth-token': token } });
-                toast.success("Cliente atualizado com sucesso!");
-                onSave(formData, clientToEdit?.id); // Correção para fechar o modal
-            } else {
-                const response = await axios.post(ADMIN_API_URL, formData, { headers: { 'x-auth-token': token } });
-                toast.success("Cliente criado com sucesso! Token gerado.");
-                onSave(formData, null, response.data.registrationToken);
-            }
-        } catch (error) {
-            toast.error(error.response?.data?.error || "Erro ao salvar cliente.");
-        }
+        // A função onSave é chamada na AdminPage, que fará a chamada à API
+        // O importante é que o formData agora tem a chave 'telefone' com o valor correto
+        onSave(formData, clientToEdit?.id);
     };
 
     return (
@@ -107,7 +96,6 @@ function ClientModal({ isOpen, onClose, onSave, clientToEdit }) {
                         <div className="input-group"><label>Razão Social*</label><input type="text" name="razao_social" value={formData.razao_social} onChange={handleChange} required /></div>
                     </div>
                     <div className="grid-2-col">
-                        {/* --- ALTERAÇÃO AQUI: 'required' removido e '*' removido do label --- */}
                         <div className="input-group"><label>CNPJ</label><input type="text" name="cnpj" value={formData.cnpj} onChange={handleChange} /></div>
                         <div className="input-group"><label>Inscrição Estadual</label><input type="text" name="inscricao_estadual" value={formData.inscricao_estadual} onChange={handleChange} /></div>
                     </div>
