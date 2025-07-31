@@ -3,7 +3,7 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const handlebars = require('handlebars');
-const AWS = require('aws-sdk'); // Importa a AWS SDK
+const AWS = require('aws-sdk');
 
 // --- CONFIGURAÇÃO DA AWS S3 ---
 const s3 = new AWS.S3({
@@ -13,12 +13,9 @@ const s3 = new AWS.S3({
 });
 const BUCKET_NAME = process.env.AWS_S3_BUCKET_NAME;
 
-// --- CONFIGURAÇÃO DO MULTER ATUALIZADA ---
-// Agora, em vez de guardar no disco, o multer guarda o ficheiro na memória para o enviarmos para a S3
 const storage = multer.memoryStorage();
 const upload = multer({ storage: storage });
 
-// --- FUNÇÕES DE UPLOAD PARA A S3 ---
 const uploadToS3 = (file, clientId, folder) => {
     const key = `${folder}/${clientId}/${Date.now()}-${file.originalname}`;
     const params = {
@@ -31,7 +28,7 @@ const uploadToS3 = (file, clientId, folder) => {
 };
 
 const deleteFromS3 = (key) => {
-    if (!key) return Promise.resolve(); // Se não houver chave, não faz nada
+    if (!key) return Promise.resolve();
     const params = {
         Bucket: BUCKET_NAME,
         Key: key,
@@ -272,6 +269,7 @@ exports.generateReport = async (req, res) => {
             `).join('');
         }
         
+        // --- CORREÇÃO AQUI: Usa a URL pública da S3 ---
         const logoUrl = profile.logo_path ? `https://${BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com/${profile.logo_path}` : '';
 
         const html = `
@@ -313,25 +311,31 @@ exports.generateReport = async (req, res) => {
 };
 
 exports.addAttachment = async (req, res) => {
-    // Esta função precisaria ser atualizada para usar S3 também
     upload.single('attachment')(req, res, async function (err) {
-        if (err) { console.error("Multer error:", err); return res.status(500).json({ error: "Erro no upload do ficheiro." }); }
+        if (err) { return res.status(500).json({ error: "Erro no upload do anexo." }); }
         if (!req.file) { return res.status(400).json({ error: "Nenhum ficheiro enviado." }); }
+
         const { transactionId } = req.params;
-        const { originalname, path: filePath, mimetype } = req.file; // Este filePath é temporário
+        const { originalname, mimetype } = req.file;
+
         try {
-            const s3Response = await uploadToS3(req.file, req.user.clientId, 'attachments');
-            
             const trxResult = await db.query('SELECT id FROM transactions WHERE id = $1 AND client_id = $2', [transactionId, req.user.clientId]);
             if (trxResult.rowCount === 0) {
-                await deleteFromS3(s3Response.Key);
                 return res.status(403).json({ error: "Acesso negado a esta transação." });
             }
-            await db.query('DELETE FROM attachments WHERE transaction_id = $1', [transactionId]);
+
+            const oldAttachment = await db.query('SELECT file_path FROM attachments WHERE transaction_id = $1', [transactionId]);
+            if (oldAttachment.rows[0] && oldAttachment.rows[0].file_path) {
+                await deleteFromS3(oldAttachment.rows[0].file_path);
+                await db.query('DELETE FROM attachments WHERE transaction_id = $1', [transactionId]);
+            }
+
+            const s3Response = await uploadToS3(req.file, req.user.clientId, 'attachments');
+            
             await db.query( 'INSERT INTO attachments (client_id, transaction_id, file_name, file_path, file_type) VALUES ($1, $2, $3, $4, $5) RETURNING id', [req.user.clientId, transactionId, originalname, s3Response.Key, mimetype] );
             res.status(201).json({ msg: 'Anexo adicionado com sucesso!' });
         } catch (dbErr) {
-            console.error(dbErr.message);
+            console.error("Erro ao salvar anexo:", dbErr);
             res.status(500).json({ error: 'Erro ao guardar a referência do anexo.' });
         }
     });
@@ -345,7 +349,7 @@ exports.deleteAttachment = async (req, res) => {
         if (attachResult.rowCount === 0) { return res.status(404).json({ error: "Anexo não encontrado ou não pertence a este cliente." }); }
         const { file_path } = attachResult.rows[0];
         
-        await deleteFromS3(file_path); // Apaga da S3
+        await deleteFromS3(file_path);
         await db.query('DELETE FROM attachments WHERE id = $1', [attachmentId]);
 
         res.json({ msg: 'Anexo excluído com sucesso.' });
@@ -364,7 +368,14 @@ exports.getProfile = async (req, res) => {
         if (result.rowCount === 0) {
             return res.status(404).json({ error: 'Perfil do cliente não encontrado.' });
         }
-        res.json(result.rows[0]);
+        
+        const profile = result.rows[0];
+        // --- CORREÇÃO AQUI: Monta a URL completa da S3 antes de enviar para o frontend ---
+        if (profile.logo_path) {
+            profile.logo_url = `https://${BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com/${profile.logo_path}`;
+        }
+
+        res.json(profile);
     } catch (err) {
         console.error(err.message);
         res.status(500).json({ error: 'Erro no servidor ao buscar perfil.' });
@@ -414,7 +425,7 @@ exports.updateProfile = (req, res) => {
             }
 
             if (fieldsToUpdate.length === 0) {
-                return res.status(200).json({ msg: 'Nenhum dado textual para atualizar.' });
+                return res.status(200).json({ msg: 'Nenhum dado para atualizar.' });
             }
 
             values.push(clientId);
@@ -426,7 +437,7 @@ exports.updateProfile = (req, res) => {
             res.json({ msg: 'Perfil atualizado com sucesso!', updatedProfile: result.rows[0] });
 
         } catch (dbErr) {
-            console.error(dbErr.message);
+            console.error("Erro ao atualizar perfil:", dbErr);
             res.status(500).json({ error: 'Erro ao atualizar o perfil na base de dados.' });
         }
     });
