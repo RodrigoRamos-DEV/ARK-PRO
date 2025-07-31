@@ -36,7 +36,6 @@ const deleteFromS3 = (key) => {
     return s3.deleteObject(params).promise();
 };
 
-
 exports.getEmployees = async (req, res) => {
     try {
         const result = await db.query('SELECT * FROM employees WHERE client_id = $1 ORDER BY name', [req.user.clientId]);
@@ -269,7 +268,6 @@ exports.generateReport = async (req, res) => {
             `).join('');
         }
         
-        // --- CORREÇÃO AQUI: Usa a URL pública da S3 ---
         const logoUrl = profile.logo_path ? `https://${BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com/${profile.logo_path}` : '';
 
         const html = `
@@ -370,7 +368,6 @@ exports.getProfile = async (req, res) => {
         }
         
         const profile = result.rows[0];
-        // --- CORREÇÃO AQUI: Monta a URL completa da S3 antes de enviar para o frontend ---
         if (profile.logo_path) {
             profile.logo_url = `https://${BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com/${profile.logo_path}`;
         }
@@ -434,7 +431,12 @@ exports.updateProfile = (req, res) => {
             
             const result = await db.query(queryText, values);
 
-            res.json({ msg: 'Perfil atualizado com sucesso!', updatedProfile: result.rows[0] });
+            const updatedProfile = result.rows[0];
+            if (updatedProfile.logo_path) {
+                updatedProfile.logo_url = `https://${BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com/${updatedProfile.logo_path}`;
+            }
+
+            res.json({ msg: 'Perfil atualizado com sucesso!', updatedProfile: updatedProfile });
 
         } catch (dbErr) {
             console.error("Erro ao atualizar perfil:", dbErr);
