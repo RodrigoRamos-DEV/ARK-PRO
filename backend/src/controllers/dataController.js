@@ -3,20 +3,42 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const handlebars = require('handlebars');
+const AWS = require('aws-sdk'); // Importa a AWS SDK
 
-const storage = multer.diskStorage({
-    destination: function (req, file, cb) {
-        const uploadDir = 'uploads/';
-        if (!fs.existsSync(uploadDir)){ fs.mkdirSync(uploadDir); }
-        cb(null, uploadDir);
-    },
-    filename: function (req, file, cb) {
-        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-        cb(null, uniqueSuffix + '-' + file.originalname);
-    }
+// --- CONFIGURAÇÃO DA AWS S3 ---
+const s3 = new AWS.S3({
+    accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+    region: process.env.AWS_REGION
 });
+const BUCKET_NAME = process.env.AWS_S3_BUCKET_NAME;
 
+// --- CONFIGURAÇÃO DO MULTER ATUALIZADA ---
+// Agora, em vez de guardar no disco, o multer guarda o ficheiro na memória para o enviarmos para a S3
+const storage = multer.memoryStorage();
 const upload = multer({ storage: storage });
+
+// --- FUNÇÕES DE UPLOAD PARA A S3 ---
+const uploadToS3 = (file, clientId, folder) => {
+    const key = `${folder}/${clientId}/${Date.now()}-${file.originalname}`;
+    const params = {
+        Bucket: BUCKET_NAME,
+        Key: key,
+        Body: file.buffer,
+        ContentType: file.mimetype,
+    };
+    return s3.upload(params).promise();
+};
+
+const deleteFromS3 = (key) => {
+    if (!key) return Promise.resolve(); // Se não houver chave, não faz nada
+    const params = {
+        Bucket: BUCKET_NAME,
+        Key: key,
+    };
+    return s3.deleteObject(params).promise();
+};
+
 
 exports.getEmployees = async (req, res) => {
     try {
@@ -250,7 +272,7 @@ exports.generateReport = async (req, res) => {
             `).join('');
         }
         
-        const logoUrl = profile.logo_path ? `${process.env.BACKEND_URL}/${profile.logo_path.replace(/\\/g, '/')}` : '';
+        const logoUrl = profile.logo_path ? `https://${BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com/${profile.logo_path}` : '';
 
         const html = `
             <!DOCTYPE html><html><head><meta charset="UTF-8"><title>Relatório de Fechamento</title><style>body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; margin: 20px;} .header{display:flex; justify-content: space-between; align-items:center; border-bottom: 2px solid #ccc; padding-bottom:10px; margin-bottom: 20px;} .header-logo{flex: 1; text-align: left;} .header-logo img{max-width:120px; max-height:100px; object-fit: contain;} .header-center{flex: 2; text-align: center;} .header-placeholder{flex: 1;} table{width:100%;border-collapse:collapse;margin-top:20px;font-size:12px}th,td{border:1px solid #ccc;padding:8px;text-align:left}th{background-color:#f2f2f2}.resumo{margin-top:20px;padding:15px;border:1px solid #ccc;background:#f9f9f9}@media print{.no-print{display:none}}</style></head>
@@ -291,23 +313,25 @@ exports.generateReport = async (req, res) => {
 };
 
 exports.addAttachment = async (req, res) => {
+    // Esta função precisaria ser atualizada para usar S3 também
     upload.single('attachment')(req, res, async function (err) {
         if (err) { console.error("Multer error:", err); return res.status(500).json({ error: "Erro no upload do ficheiro." }); }
         if (!req.file) { return res.status(400).json({ error: "Nenhum ficheiro enviado." }); }
         const { transactionId } = req.params;
-        const { originalname, path: filePath, mimetype } = req.file;
+        const { originalname, path: filePath, mimetype } = req.file; // Este filePath é temporário
         try {
+            const s3Response = await uploadToS3(req.file, req.user.clientId, 'attachments');
+            
             const trxResult = await db.query('SELECT id FROM transactions WHERE id = $1 AND client_id = $2', [transactionId, req.user.clientId]);
             if (trxResult.rowCount === 0) {
-                fs.unlinkSync(filePath);
+                await deleteFromS3(s3Response.Key);
                 return res.status(403).json({ error: "Acesso negado a esta transação." });
             }
             await db.query('DELETE FROM attachments WHERE transaction_id = $1', [transactionId]);
-            await db.query( 'INSERT INTO attachments (client_id, transaction_id, file_name, file_path, file_type) VALUES ($1, $2, $3, $4, $5) RETURNING id', [req.user.clientId, transactionId, originalname, filePath, mimetype] );
+            await db.query( 'INSERT INTO attachments (client_id, transaction_id, file_name, file_path, file_type) VALUES ($1, $2, $3, $4, $5) RETURNING id', [req.user.clientId, transactionId, originalname, s3Response.Key, mimetype] );
             res.status(201).json({ msg: 'Anexo adicionado com sucesso!' });
         } catch (dbErr) {
             console.error(dbErr.message);
-            fs.unlinkSync(filePath); 
             res.status(500).json({ error: 'Erro ao guardar a referência do anexo.' });
         }
     });
@@ -320,8 +344,10 @@ exports.deleteAttachment = async (req, res) => {
         const attachResult = await db.query( 'SELECT file_path FROM attachments WHERE id = $1 AND client_id = $2', [attachmentId, clientId] );
         if (attachResult.rowCount === 0) { return res.status(404).json({ error: "Anexo não encontrado ou não pertence a este cliente." }); }
         const { file_path } = attachResult.rows[0];
+        
+        await deleteFromS3(file_path); // Apaga da S3
         await db.query('DELETE FROM attachments WHERE id = $1', [attachmentId]);
-        if (fs.existsSync(file_path)) { fs.unlinkSync(file_path); }
+
         res.json({ msg: 'Anexo excluído com sucesso.' });
     } catch (err) {
         console.error(err.message);
@@ -353,62 +379,54 @@ exports.updateProfile = (req, res) => {
 
         const { companyName, contactPhone, fullAddress } = req.body;
         const clientId = req.user.clientId;
-        let logoPath = null;
-        if (req.file) {
-            logoPath = req.file.path;
-        }
 
         try {
-            if (logoPath) {
+            let newLogoPath = null;
+            if (req.file) {
                 const oldProfile = await db.query('SELECT logo_path FROM clients WHERE id = $1', [clientId]);
                 if (oldProfile.rows[0] && oldProfile.rows[0].logo_path) {
-                    if (fs.existsSync(oldProfile.rows[0].logo_path)) {
-                        fs.unlinkSync(oldProfile.rows[0].logo_path);
-                    }
+                    await deleteFromS3(oldProfile.rows[0].logo_path);
                 }
+                
+                const s3Response = await uploadToS3(req.file, clientId, 'logos');
+                newLogoPath = s3Response.Key;
             }
             
             const fieldsToUpdate = [];
             const values = [];
             let queryIndex = 1;
 
-            if (companyName) {
+            if (companyName !== undefined) {
                 fieldsToUpdate.push(`company_name = $${queryIndex++}`);
                 values.push(companyName);
             }
-            if (contactPhone) {
+            if (contactPhone !== undefined) {
                 fieldsToUpdate.push(`contact_phone = $${queryIndex++}`);
                 values.push(contactPhone);
             }
-            if (fullAddress) {
+            if (fullAddress !== undefined) {
                 fieldsToUpdate.push(`full_address = $${queryIndex++}`);
                 values.push(fullAddress);
             }
-            if (logoPath) {
+            if (newLogoPath) {
                 fieldsToUpdate.push(`logo_path = $${queryIndex++}`);
-                values.push(logoPath);
+                values.push(newLogoPath);
             }
 
-            if (fieldsToUpdate.length === 0 && !logoPath) {
-                // Se nenhum campo de texto foi alterado E nenhum ficheiro foi enviado, não faz nada.
-                return res.json({ msg: 'Nenhum dado para atualizar.' });
+            if (fieldsToUpdate.length === 0) {
+                return res.status(200).json({ msg: 'Nenhum dado textual para atualizar.' });
             }
 
-            // Se apenas o logo foi enviado mas nenhum outro campo de texto
-            if (fieldsToUpdate.length > 0) {
-                 values.push(clientId);
-                const queryText = `UPDATE clients SET ${fieldsToUpdate.join(', ')} WHERE id = $${queryIndex} RETURNING *`;
-                const result = await db.query(queryText, values);
-                return res.json({ msg: 'Perfil atualizado com sucesso!', updatedProfile: result.rows[0] });
-            } else if (logoPath) {
-                // Caso especial onde SÓ o logo é atualizado
-                 const result = await db.query('UPDATE clients SET logo_path = $1 WHERE id = $2 RETURNING *', [logoPath, clientId]);
-                 return res.json({ msg: 'Perfil atualizado com sucesso!', updatedProfile: result.rows[0] });
-            }
+            values.push(clientId);
             
+            const queryText = `UPDATE clients SET ${fieldsToUpdate.join(', ')} WHERE id = $${queryIndex} RETURNING *`;
+            
+            const result = await db.query(queryText, values);
+
+            res.json({ msg: 'Perfil atualizado com sucesso!', updatedProfile: result.rows[0] });
+
         } catch (dbErr) {
             console.error(dbErr.message);
-            if (logoPath) { fs.unlinkSync(logoPath); }
             res.status(500).json({ error: 'Erro ao atualizar o perfil na base de dados.' });
         }
     });
