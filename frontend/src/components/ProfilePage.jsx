@@ -21,9 +21,13 @@ function ProfilePage() {
             try {
                 const response = await axios.get(`${DATA_API_URL}/profile`, { headers: { 'x-auth-token': token } });
                 setProfileData(response.data);
-                if (response.data.logo_path) {
-                    setLogoPreview(`${API_URL}/${response.data.logo_path.replace(/\\/g, '/')}`);
+                
+                // --- CORREÇÃO DEFINITIVA AQUI ---
+                // Agora, ele usa o link completo 'logo_url' que o backend envia.
+                if (response.data.logo_url) {
+                    setLogoPreview(response.data.logo_url);
                 }
+
             } catch (error) {
                 toast.error("Erro ao carregar os dados do perfil.");
             } finally {
@@ -41,6 +45,7 @@ function ProfilePage() {
         const file = e.target.files[0];
         if (file) {
             setLogoFile(file);
+            // Cria uma pré-visualização local temporária
             setLogoPreview(URL.createObjectURL(file));
         }
     };
@@ -58,13 +63,18 @@ function ProfilePage() {
         }
 
         try {
-            await axios.put(`${DATA_API_URL}/profile`, formData, {
+            const response = await axios.put(`${DATA_API_URL}/profile`, formData, {
                 headers: { 
                     'x-auth-token': token,
                     'Content-Type': 'multipart/form-data'
                 }
             });
             toast.success("Perfil atualizado com sucesso!");
+            // Atualiza a pré-visualização com o link final da S3 após o upload
+            if (response.data.updatedProfile && response.data.updatedProfile.logo_url) {
+                setLogoPreview(response.data.updatedProfile.logo_url);
+            }
+            setLogoFile(null); // Limpa o ficheiro após o upload
         } catch (error) {
             toast.error(error.response?.data?.error || "Erro ao salvar o perfil.");
         } finally {
