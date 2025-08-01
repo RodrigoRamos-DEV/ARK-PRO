@@ -11,7 +11,6 @@ const ensureAdmin = (req, res, next) => {
 
 const getAllClients = async (req, res) => {
     try {
-        // --- ATUALIZADO AQUI para incluir o nome do sócio ---
         const query = `
             SELECT 
                 c.id, c.company_name, c.razao_social, c.cnpj, c.inscricao_estadual,
@@ -43,8 +42,7 @@ const createClient = async (req, res) => {
         companyName, razao_social, cnpj, inscricao_estadual, inscricao_municipal,
         responsavel_nome, telefone, endereco_logradouro, endereco_numero,
         endereco_bairro, endereco_cidade, endereco_uf, endereco_cep,
-        regime_tributario, licenseExpiresAt,
-        partnerId // <-- NOVO CAMPO
+        regime_tributario, licenseExpiresAt, partnerId
     } = req.body;
 
     if (!companyName || !licenseExpiresAt || !razao_social || !responsavel_nome || !telefone) {
@@ -54,8 +52,6 @@ const createClient = async (req, res) => {
     const client = await db.getClient();
     try {
         await client.query('BEGIN');
-
-        // --- ATUALIZADO AQUI para incluir o partner_id ---
         const newClientResult = await client.query(
             `INSERT INTO clients (
                 company_name, razao_social, cnpj, inscricao_estadual, inscricao_municipal,
@@ -103,11 +99,9 @@ const updateClient = async (req, res) => {
         companyName, razao_social, cnpj, inscricao_estadual, inscricao_municipal,
         responsavel_nome, telefone, endereco_logradouro, endereco_numero,
         endereco_bairro, endereco_cidade, endereco_uf, endereco_cep,
-        regime_tributario, licenseStatus, licenseExpiresAt,
-        partnerId // <-- NOVO CAMPO
+        regime_tributario, licenseStatus, licenseExpiresAt, partnerId
     } = req.body;
     try {
-        // --- ATUALIZADO AQUI para incluir o partner_id ---
         const result = await db.query(
             `UPDATE clients SET 
                 company_name = $1, razao_social = $2, cnpj = $3, inscricao_estadual = $4, 

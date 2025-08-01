@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { toast } from 'react-toastify';
 import API_URL from '../apiConfig';
 
 function ClientModal({ isOpen, onClose, onSave, clientToEdit }) {
@@ -20,13 +19,25 @@ function ClientModal({ isOpen, onClose, onSave, clientToEdit }) {
         endereco_cep: '',
         regime_tributario: 'Simples Nacional',
         licenseStatus: 'Ativo',
-        licenseExpiresAt: ''
+        licenseExpiresAt: '',
+        partnerId: ''
     });
-
+    const [partners, setPartners] = useState([]);
     const isEditMode = !!clientToEdit;
 
     useEffect(() => {
+        const fetchPartners = async () => {
+            const token = localStorage.getItem('token');
+            try {
+                const response = await axios.get(`${API_URL}/api/partners`, { headers: { 'x-auth-token': token } });
+                setPartners(response.data);
+            } catch (error) {
+                console.error("Erro ao buscar sócios", error);
+            }
+        };
+
         if (isOpen) {
+            fetchPartners();
             if (isEditMode) {
                 setFormData({
                     companyName: clientToEdit.company_name || '',
@@ -35,8 +46,6 @@ function ClientModal({ isOpen, onClose, onSave, clientToEdit }) {
                     inscricao_estadual: clientToEdit.inscricao_estadual || '',
                     inscricao_municipal: clientToEdit.inscricao_municipal || '',
                     responsavel_nome: clientToEdit.responsavel_nome || '',
-                    // --- CORREÇÃO AQUI ---
-                    // Lê da coluna 'business_phone' que vem do backend
                     telefone: clientToEdit.business_phone || '',
                     endereco_logradouro: clientToEdit.endereco_logradouro || '',
                     endereco_numero: clientToEdit.endereco_numero || '',
@@ -46,7 +55,8 @@ function ClientModal({ isOpen, onClose, onSave, clientToEdit }) {
                     endereco_cep: clientToEdit.endereco_cep || '',
                     regime_tributario: clientToEdit.regime_tributario || 'Simples Nacional',
                     licenseStatus: clientToEdit.license_status || 'Ativo',
-                    licenseExpiresAt: clientToEdit.license_expires_at ? new Date(clientToEdit.license_expires_at).toISOString().split('T')[0] : ''
+                    licenseExpiresAt: clientToEdit.license_expires_at ? new Date(clientToEdit.license_expires_at).toISOString().split('T')[0] : '',
+                    partnerId: clientToEdit.partner_id || ''
                 });
             } else {
                 setFormData({
@@ -65,7 +75,8 @@ function ClientModal({ isOpen, onClose, onSave, clientToEdit }) {
                     endereco_cep: '',
                     regime_tributario: 'Simples Nacional',
                     licenseStatus: 'Ativo',
-                    licenseExpiresAt: ''
+                    licenseExpiresAt: '',
+                    partnerId: ''
                 });
             }
         }
@@ -77,10 +88,8 @@ function ClientModal({ isOpen, onClose, onSave, clientToEdit }) {
         setFormData({ ...formData, [e.target.name]: e.target.value });
     };
 
-    const handleSubmit = async (e) => {
+    const handleSubmit = (e) => {
         e.preventDefault();
-        // A função onSave é chamada na AdminPage, que fará a chamada à API
-        // O importante é que o formData agora tem a chave 'telefone' com o valor correto
         onSave(formData, clientToEdit?.id);
     };
 
@@ -100,10 +109,17 @@ function ClientModal({ isOpen, onClose, onSave, clientToEdit }) {
                         <div className="input-group"><label>Inscrição Estadual</label><input type="text" name="inscricao_estadual" value={formData.inscricao_estadual} onChange={handleChange} /></div>
                     </div>
 
-                    <h4>Informações de Contato</h4>
+                    <h4>Informações de Contato e Sócio</h4>
                     <div className="grid-2-col">
                         <div className="input-group"><label>Nome do Responsável*</label><input type="text" name="responsavel_nome" value={formData.responsavel_nome} onChange={handleChange} required /></div>
                         <div className="input-group"><label>Telefone*</label><input type="text" name="telefone" value={formData.telefone} onChange={handleChange} required /></div>
+                    </div>
+                     <div className="input-group">
+                        <label>Sócio Responsável (Opcional)</label>
+                        <select name="partnerId" value={formData.partnerId} onChange={handleChange}>
+                            <option value="">Nenhum</option>
+                            {partners.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                        </select>
                     </div>
                     
                     <h4>Endereço</h4>

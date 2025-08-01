@@ -1,14 +1,15 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import axios from 'axios';
 import { toast } from 'react-toastify';
 import ClientModal from './ClientModal';
 import ConfirmModal from './ConfirmModal';
 import { Doughnut } from 'react-chartjs-2';
-import API_URL from '../apiConfig'; // <-- Este é o import correto que vamos usar
-import { Link } from 'react-router-dom';
+import { Chart as ChartJS, ArcElement, Tooltip, Legend } from 'chart.js';
+import API_URL from '../apiConfig';
 
+ChartJS.register(ArcElement, Tooltip, Legend);
 
-// Componente para os Cartões de Estatísticas
 const StatCard = ({ title, value, color }) => (
     <div className="card" style={{ textAlign: 'center', padding: '20px' }}>
         <h3 style={{ margin: 0, color: 'var(--cor-texto-label)', fontSize: '1em' }}>{title}</h3>
@@ -16,17 +17,12 @@ const StatCard = ({ title, value, color }) => (
     </div>
 );
 
-// Função auxiliar para os estilos das etiquetas de status
 const getStatusStyles = (status) => {
     switch (status) {
-        case 'Vencido':
-            return { backgroundColor: 'var(--cor-erro)', color: 'white' };
-        case 'A Vencer':
-            return { backgroundColor: 'var(--cor-aviso)', color: '#333' };
-        case 'Ativo':
-            return { backgroundColor: 'var(--cor-sucesso)', color: 'white' };
-        default:
-            return { backgroundColor: '#e5e7eb', color: '#333' };
+        case 'Vencido': return { backgroundColor: '#dc2626', color: 'white' };
+        case 'A Vencer': return { backgroundColor: '#f59e0b', color: '#333' };
+        case 'Ativo': return { backgroundColor: '#16a34a', color: 'white' };
+        default: return { backgroundColor: '#e5e7eb', color: '#333' };
     }
 };
 
@@ -44,47 +40,48 @@ function AdminPage() {
 
     const fetchData = async () => {
         setLoading(true);
-       try {
+        try {
             const [clientsResponse, dashboardResponse] = await Promise.all([
                 axios.get(`${ADMIN_API_URL}/clients`, { headers: { 'x-auth-token': token } }),
                 axios.get(`${ADMIN_API_URL}/dashboard`, { headers: { 'x-auth-token': token } })
             ]);
             setClients(clientsResponse.data);
             setDashboardData(dashboardResponse.data);
-        } catch (error) {
-            toast.error("Erro ao carregar dados do painel.");
-        } finally {
-            setLoading(false);
-        }
+        } catch (error) { toast.error("Erro ao carregar dados do painel."); } 
+        finally { setLoading(false); }
     };
 
-    useEffect(() => {
-        fetchData();
-    }, []);
+    useEffect(() => { fetchData(); }, []);
 
-    const handleSaveClient = (formData, clientId, registrationToken) => {
-        if (registrationToken) {
-            setNewToken(registrationToken);
+    const handleSaveClient = async (formData, clientId) => {
+        try {
+            if (clientId) {
+                await axios.put(`${ADMIN_API_URL}/clients/${clientId}`, formData, { headers: { 'x-auth-token': token } });
+                toast.success("Cliente atualizado com sucesso!");
+            } else {
+                const response = await axios.post(`${ADMIN_API_URL}/clients`, formData, { headers: { 'x-auth-token': token } });
+                toast.success("Cliente criado com sucesso! Token gerado.");
+                setNewToken(response.data.registrationToken);
+            }
+            fetchData();
+            setIsModalOpen(false);
+            setEditingClient(null);
+        } catch (error) {
+            toast.error(error.response?.data?.error || "Erro ao salvar cliente.");
         }
-        fetchData();
-        setIsModalOpen(false);
-        setEditingClient(null);
     };
 
     const handleDeleteClient = (client) => {
         setConfirmState({
             isOpen: true,
-            message: `Tem certeza que deseja excluir o cliente "${client.company_name}"? Todos os seus dados (usuários, lançamentos, etc.) serão perdidos permanentemente.`,
+            message: `Tem certeza que deseja excluir o cliente "${client.company_name}"? Todos os seus dados serão perdidos permanentemente.`,
             onConfirm: async () => {
                 try {
                     await axios.delete(`${ADMIN_API_URL}/clients/${client.id}`, { headers: { 'x-auth-token': token } });
                     toast.success("Cliente excluído com sucesso!");
                     fetchData();
                     closeConfirmModal();
-                } catch (error) {
-                    toast.error("Erro ao excluir cliente.");
-                    closeConfirmModal();
-                }
+                } catch (error) { toast.error("Erro ao excluir cliente."); closeConfirmModal(); }
             }
         });
     };
@@ -99,10 +96,7 @@ function AdminPage() {
                     toast.success("Licença renovada com sucesso!");
                     fetchData();
                     closeConfirmModal();
-                } catch (error) {
-                    toast.error(error.response?.data?.error || "Erro ao renovar a licença.");
-                    closeConfirmModal();
-                }
+                } catch (error) { toast.error(error.response?.data?.error || "Erro ao renovar a licença."); closeConfirmModal(); }
             }
         });
     };
@@ -120,17 +114,12 @@ function AdminPage() {
     const chartData = {
         labels: ['Ativos', 'A Vencer', 'Vencidos'],
         datasets: [{
-            label: 'Clientes por Status',
             data: [
                 dashboardData?.summary?.ativos || 0,
                 dashboardData?.summary?.a_vencer || 0,
                 dashboardData?.summary?.vencidos || 0
             ],
-            backgroundColor: [
-                'var(--cor-sucesso)',
-                'var(--cor-aviso)',
-                'var(--cor-erro)'
-            ],
+            backgroundColor: [ '#16a34a', '#f59e0b', '#dc2626' ],
             borderColor: 'var(--cor-card)',
             borderWidth: 2,
         }]
@@ -155,7 +144,6 @@ function AdminPage() {
 
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '10px' }}>
                 <h2>Painel do Administrador</h2>
-                {/* --- BOTÃO ADICIONADO AQUI --- */}
                 <div style={{display: 'flex', gap: '10px', flexWrap: 'wrap'}}>
                     <Link to="/admin/partners" className="btn" style={{ width: 'auto', backgroundColor: 'var(--cor-destaque)'}}>
                         Controle de Sócios
@@ -168,11 +156,10 @@ function AdminPage() {
                 <>
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '20px' }}>
                         <StatCard title="Total de Clientes" value={dashboardData.summary.total_clients} />
-                        <StatCard title="Ativos" value={dashboardData.summary.ativos} color="var(--cor-sucesso)" />
-                        <StatCard title="A Vencer" value={dashboardData.summary.a_vencer} color="var(--cor-aviso)" />
-                        <StatCard title="Vencidos" value={dashboardData.summary.vencidos} color="var(--cor-erro)" />
+                        <StatCard title="Ativos" value={dashboardData.summary.ativos} color="#16a34a" />
+                        <StatCard title="A Vencer" value={dashboardData.summary.a_vencer} color="#f59e0b" />
+                        <StatCard title="Vencidos" value={dashboardData.summary.vencidos} color="#dc2626" />
                     </div>
-
                     <div className="card grid-2-col" style={{marginTop: '20px'}}>
                         <div>
                             <h3>Clientes por Status</h3>
@@ -196,7 +183,6 @@ function AdminPage() {
                     </div>
                 </>
             )}
-
             <div className="card">
                 <h3>Clientes Cadastrados</h3>
                 {loading ? <p>A carregar lista de clientes...</p> : (
@@ -205,6 +191,7 @@ function AdminPage() {
                             <thead>
                                 <tr style={{ borderBottom: '2px solid var(--cor-primaria)' }}>
                                     <th style={{ padding: '10px', textAlign: 'left' }}>Empresa (Fantasia)</th>
+                                    <th style={{ padding: '10px', textAlign: 'left' }}>Sócio</th>
                                     <th style={{ padding: '10px', textAlign: 'left' }}>Vencimento</th>
                                     <th style={{ padding: '10px', textAlign: 'left' }}>Status</th>
                                     <th style={{ padding: '10px', textAlign: 'center' }}>Ações</th>
@@ -214,15 +201,10 @@ function AdminPage() {
                                 {clients.map(client => (
                                     <tr key={client.id} style={{ borderBottom: '1px solid var(--cor-borda)' }}>
                                         <td style={{ padding: '10px' }}>{client.company_name}</td>
+                                        <td style={{ padding: '10px' }}>{client.partner_name || 'N/A'}</td>
                                         <td style={{ padding: '10px' }}>{client.license_expires_at ? new Date(client.license_expires_at).toLocaleDateString('pt-BR', {timeZone: 'UTC'}) : 'N/A'}</td>
                                         <td style={{ padding: '10px' }}>
-                                            <span style={{
-                                                padding: '4px 8px',
-                                                borderRadius: '12px',
-                                                fontSize: '0.8em',
-                                                fontWeight: 'bold',
-                                                ...getStatusStyles(client.license_status)
-                                            }}>
+                                            <span style={{ padding: '4px 8px', borderRadius: '12px', fontSize: '0.8em', fontWeight: 'bold', ...getStatusStyles(client.license_status) }}>
                                                 {client.license_status}
                                             </span>
                                         </td>
