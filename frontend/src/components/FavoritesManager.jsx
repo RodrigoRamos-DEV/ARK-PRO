@@ -9,16 +9,45 @@ const FavoritesManager = () => {
     loadFavorites();
   }, []);
 
-  const loadFavorites = () => {
-    const userFavorites = JSON.parse(localStorage.getItem(`favorites_${user.id}`) || '[]');
-    const allProducts = JSON.parse(localStorage.getItem('vitrine_produtos') || '[]');
-    
-    // Buscar produtos completos dos favoritos
-    const favoriteProducts = allProducts.filter(product => 
-      userFavorites.includes(product.id)
-    );
-    
-    setFavorites(favoriteProducts);
+  const loadFavorites = async () => {
+    try {
+      const userFavorites = JSON.parse(localStorage.getItem(`favorites_${user.id}`) || '[]');
+      
+      if (userFavorites.length === 0) {
+        setFavorites([]);
+        return;
+      }
+      
+      // Tentar buscar da API primeiro
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${process.env.REACT_APP_API_URL || 'https://ark-pro-backend.onrender.com'}/api/feira/produtos`, {
+        headers: { 'x-auth-token': token }
+      });
+      
+      let allProducts = [];
+      if (response.ok) {
+        allProducts = await response.json();
+      } else {
+        // Fallback para localStorage
+        allProducts = JSON.parse(localStorage.getItem('vitrine_produtos') || '[]');
+      }
+      
+      // Buscar produtos completos dos favoritos
+      const favoriteProducts = allProducts.filter(product => 
+        userFavorites.includes(product.id)
+      );
+      
+      setFavorites(favoriteProducts);
+    } catch (error) {
+      console.log('Erro ao buscar favoritos da API, usando localStorage:', error);
+      // Fallback para localStorage
+      const userFavorites = JSON.parse(localStorage.getItem(`favorites_${user.id}`) || '[]');
+      const allProducts = JSON.parse(localStorage.getItem('vitrine_produtos') || '[]');
+      const favoriteProducts = allProducts.filter(product => 
+        userFavorites.includes(product.id)
+      );
+      setFavorites(favoriteProducts);
+    }
   };
 
   const removeFavorite = (productId) => {

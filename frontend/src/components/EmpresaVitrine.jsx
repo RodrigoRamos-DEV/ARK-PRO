@@ -72,11 +72,25 @@ function EmpresaVitrine() {
 
   const fetchProdutos = async () => {
     try {
-      // Buscar produtos da vitrine (localStorage dos produtores)
+      // Tentar buscar da API primeiro
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_URL}/api/feira/produtos`, {
+        headers: { 'x-auth-token': token }
+      });
+      
+      if (response.ok) {
+        const apiProdutos = await response.json();
+        setProdutos(apiProdutos);
+      } else {
+        // Fallback para localStorage
+        const vitrineProdutos = JSON.parse(localStorage.getItem('vitrine_produtos') || '[]');
+        setProdutos(vitrineProdutos);
+      }
+    } catch (error) {
+      console.log('Erro ao buscar da API, usando localStorage:', error);
+      // Fallback para localStorage
       const vitrineProdutos = JSON.parse(localStorage.getItem('vitrine_produtos') || '[]');
       setProdutos(vitrineProdutos);
-    } catch (error) {
-      toast.error('Erro ao carregar produtos');
     } finally {
       setLoading(false);
     }
