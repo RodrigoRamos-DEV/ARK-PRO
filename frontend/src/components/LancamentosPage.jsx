@@ -533,7 +533,7 @@ function LancamentosPage() {
                 tipo={pedidoTipo}
                 funcionarios={funcionarios}
                 produtos={items.produto || []}
-                clientes={items.comprador || []}
+                clientes={pedidoTipo === 'venda' ? (items.comprador || []) : (items.fornecedor || [])}
                 editingPedido={editingPedido}
             />
             

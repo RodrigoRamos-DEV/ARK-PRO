@@ -49,7 +49,7 @@ const PedidoModal = ({ isOpen, onClose, onSave, tipo, funcionarios, produtos, cl
       fetchProdutos();
       fetchClientes();
     }
-  }, [isOpen, funcionarios, editingPedido]);
+  }, [isOpen, funcionarios, editingPedido, tipo]);
 
   const fetchProdutos = async () => {
     try {
@@ -68,8 +68,6 @@ const PedidoModal = ({ isOpen, onClose, onSave, tipo, funcionarios, produtos, cl
         headers: { 'x-auth-token': token }
       });
       const tipoCliente = tipo === 'venda' ? 'comprador' : 'fornecedor';
-      console.log('Dados retornados:', response.data);
-      console.log('Tipo cliente:', tipoCliente);
       setClientesList(response.data[tipoCliente] || []);
     } catch (error) {
       console.error('Erro ao buscar clientes:', error);
