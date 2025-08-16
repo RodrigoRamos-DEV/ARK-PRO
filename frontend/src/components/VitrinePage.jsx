@@ -218,7 +218,7 @@ function VitrinePage() {
         return;
       }
       
-      if (formData.fotos.length === 0) {
+      if (formData.fotos.length === 0 && !editingProduct) {
         toast.error('Adicione pelo menos uma foto');
         return;
       }
@@ -324,10 +324,37 @@ function VitrinePage() {
                 }}
                 required={!editingProduct}
               />
-              {editingProduct && formData.fotos.length === 0 && (
-                <p style={{ fontSize: '0.9em', color: '#666', margin: '5px 0' }}>
-                  Deixe em branco para manter as fotos atuais
-                </p>
+              {editingProduct && (
+                <div style={{ marginTop: '10px' }}>
+                  <p style={{ fontSize: '0.9em', color: '#666', margin: '5px 0' }}>
+                    {formData.fotos.length === 0 ? 'Mantendo fotos atuais' : 'Novas fotos selecionadas'}
+                  </p>
+                  {editingProduct.fotos && editingProduct.fotos.length > 0 && formData.fotos.length === 0 && (
+                    <div style={{ display: 'flex', gap: '10px', marginTop: '10px', flexWrap: 'wrap' }}>
+                      {editingProduct.fotos.map((foto, index) => (
+                        <div key={index} style={{ position: 'relative' }}>
+                          <img 
+                            src={foto} 
+                            alt={`Foto atual ${index + 1}`}
+                            style={{ width: '80px', height: '60px', objectFit: 'cover', borderRadius: '4px', opacity: 0.7 }}
+                          />
+                          <div style={{
+                            position: 'absolute',
+                            bottom: '2px',
+                            left: '2px',
+                            background: 'rgba(0,0,0,0.7)',
+                            color: 'white',
+                            fontSize: '10px',
+                            padding: '2px 4px',
+                            borderRadius: '2px'
+                          }}>
+                            Atual
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               )}
               {formData.fotos.length > 0 && (
                 <div style={{ display: 'flex', gap: '10px', marginTop: '10px', flexWrap: 'wrap' }}>
