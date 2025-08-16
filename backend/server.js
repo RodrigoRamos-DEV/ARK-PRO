@@ -14,6 +14,7 @@ const auditRoutes = require('./src/routes/auditRoutes');
 const importExportRoutes = require('./src/routes/importExportRoutes');
 const feiraRoutes = require('./src/routes/feira');
 const adminNotificationRoutes = require('./src/routes/admin');
+const migrateRoutes = require('./src/routes/migrate');
 
 
 const app = express();
@@ -37,6 +38,7 @@ app.use('/api/audit', auditRoutes);
 app.use('/api', importExportRoutes);
 app.use('/api/feira', feiraRoutes);
 app.use('/api/admin', adminNotificationRoutes);
+app.use('/api/migrate', migrateRoutes);
 
 
 

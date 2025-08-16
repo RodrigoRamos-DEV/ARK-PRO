@@ -5,8 +5,7 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "nodemon server.js",
-    "postinstall": "node run-feira-migrations.js || echo 'Migrações já executadas'"
+    "dev": "nodemon server.js"
   },
   "dependencies": {
     "aws-sdk": "^2.1692.0",
