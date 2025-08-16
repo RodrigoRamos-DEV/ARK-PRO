@@ -145,7 +145,7 @@ exports.getProdutos = async (req, res) => {
             SELECT id, name, codigo, unidade, categoria, preco_venda, preco_custo, 
                    estoque_atual, estoque_minimo, observacoes, type
             FROM items 
-            WHERE client_id = $1 AND type IN ('produto', 'compra') AND ativo = true 
+            WHERE client_id = $1 AND type IN ('produto', 'compra') AND (ativo = true OR ativo IS NULL) 
             ORDER BY name
         `, [req.user.clientId]);
         res.json(result.rows);
@@ -1157,7 +1157,7 @@ exports.globalSearch = async (req, res) => {
         const produtos = await db.query(`
             SELECT id, name, codigo, categoria, 'produto' as type
             FROM items 
-            WHERE client_id = $1 AND type IN ('produto', 'compra') AND ativo = true
+            WHERE client_id = $1 AND type IN ('produto', 'compra') AND (ativo = true OR ativo IS NULL)
             AND (LOWER(name) LIKE $2 OR LOWER(codigo) LIKE $2 OR LOWER(categoria) LIKE $2)
             LIMIT 5
         `, [clientId, searchTerm]);
@@ -1270,7 +1270,7 @@ exports.getDashboardData = async (req, res) => {
         const contadoresResult = await db.query(`
             SELECT 
                 (SELECT COUNT(DISTINCT category) FROM transactions WHERE client_id = $1 AND type = 'venda' AND transaction_date >= $2) as clientes_ativos,
-                (SELECT COUNT(*) FROM items WHERE client_id = $1 AND type IN ('produto', 'compra') AND ativo = true) as produtos_cadastrados,
+                (SELECT COUNT(*) FROM items WHERE client_id = $1 AND type IN ('produto', 'compra') AND (ativo = true OR ativo IS NULL)) as produtos_cadastrados,
                 (SELECT COUNT(*) FROM notas_fiscais WHERE client_id = $1 AND data_emissao >= $2) as notas_fiscais_mes
         `, [clientId, dataInicio.toISOString().split('T')[0]]);
         
@@ -1331,7 +1331,7 @@ exports.getDashboardData = async (req, res) => {
         const estoqueBaixoResult = await db.query(`
             SELECT COUNT(*) as count FROM items 
             WHERE client_id = $1 AND type IN ('produto', 'compra') 
-            AND ativo = true AND estoque_atual <= estoque_minimo AND estoque_minimo > 0
+            AND (ativo = true OR ativo IS NULL) AND estoque_atual <= estoque_minimo AND estoque_minimo > 0
         `, [clientId]);
         
         if (estoqueBaixoResult.rows[0].count > 0) {
