@@ -67,12 +67,19 @@ router.post('/feira', async (req, res) => {
           UNIQUE(user_id, notification_id)
       );
 
+      -- Corrigir coluna client_type na tabela users
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS client_type VARCHAR(20) DEFAULT 'produtor';
+      
+      -- Atualizar registros existentes sem client_type
+      UPDATE users SET client_type = 'produtor' WHERE client_type IS NULL;
+
       -- Índices para performance
       CREATE INDEX IF NOT EXISTS idx_feira_produtos_user_id ON feira_produtos(user_id);
       CREATE INDEX IF NOT EXISTS idx_feira_produtos_disponivel ON feira_produtos(disponivel);
       CREATE INDEX IF NOT EXISTS idx_feira_produtos_categoria ON feira_produtos(categoria);
       CREATE INDEX IF NOT EXISTS idx_feira_favoritos_user_id ON feira_favoritos(user_id);
       CREATE INDEX IF NOT EXISTS idx_admin_notifications_target ON admin_notifications(target_audience);
+      CREATE INDEX IF NOT EXISTS idx_users_client_type ON users(client_type);
     `;
 
     // Executar migração
