@@ -4,6 +4,7 @@ import axios from 'axios';
 import API_URL from '../apiConfig';
 import ClientNotifications from './ClientNotifications';
 import { feiraService } from '../feiraService';
+import '../css/feira-responsive.css';
 
 function VitrinePage() {
   const [userType, setUserType] = useState('');
@@ -27,18 +28,8 @@ function VitrinePage() {
         });
         setProfileData(response.data);
         
-        // Atualizar produtos existentes com o WhatsApp correto
-        if (response.data.contact_phone) {
-          const whatsappCorreto = response.data.contact_phone.replace(/\D/g, '');
-          const allProducts = JSON.parse(localStorage.getItem('vitrine_produtos') || '[]');
-          const produtosAtualizados = allProducts.map(produto => {
-            if (produto.userId === user.id) {
-              return { ...produto, whatsapp: whatsappCorreto };
-            }
-            return produto;
-          });
-          localStorage.setItem('vitrine_produtos', JSON.stringify(produtosAtualizados));
-        }
+        // Dados do perfil carregados com sucesso
+        console.log('Perfil carregado:', response.data);
       } catch (error) {
         console.log('Erro ao buscar perfil:', error);
       }
@@ -447,7 +438,7 @@ function VitrinePage() {
   };
 
   const ProductCard = ({ produto }) => (
-    <div className="card" style={{ 
+    <div className="card product-card" style={{ 
       width: '280px', 
       margin: '0', 
       padding: '0',
@@ -525,7 +516,7 @@ function VitrinePage() {
             <p style={{ margin: '4px 0', fontSize: '0.85em', color: '#888' }}>
               Por: {produto.produtor}
             </p>
-            <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
+            <div className="product-actions" style={{ display: 'flex', gap: '8px', marginTop: '12px' }}
               <a 
                 href={`https://wa.me/55${produto.whatsapp}?text=Olá! Vi seu produto ${produto.nome} na vitrine e tenho interesse.`}
                 target="_blank"
@@ -559,7 +550,7 @@ function VitrinePage() {
         )}
         
         {userType === 'produtor' && (
-          <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
+          <div className="product-actions" style={{ display: 'flex', gap: '8px', marginTop: '12px' }}
             <button 
               onClick={() => editProduto(produto)}
               className="btn"
@@ -610,7 +601,7 @@ function VitrinePage() {
   return (
     <div>
       <ClientNotifications />
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+      <div className="feira-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}
         <h2>🏪 Feira {userType === 'produtor' ? 'dos Meus Produtos' : 'de Produtos'}</h2>
         {userType === 'produtor' && (
           <button 
@@ -623,19 +614,37 @@ function VitrinePage() {
       </div>
       
       {/* Filtros */}
-      <div style={{ display: 'flex', gap: '15px', marginBottom: '20px', flexWrap: 'wrap' }}>
+      <div className="feira-filters" style={{ 
+        display: 'flex', 
+        gap: '15px', 
+        marginBottom: '20px', 
+        flexWrap: 'wrap'
+      }}
         <input
           type="text"
           placeholder="Buscar produtos..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          style={{ flex: 1, minWidth: '200px', padding: '10px', border: '1px solid var(--cor-borda)', borderRadius: '6px' }}
+          style={{ 
+            flex: 1, 
+            minWidth: '200px', 
+            padding: '12px', 
+            border: '1px solid var(--cor-borda)', 
+            borderRadius: '8px',
+            fontSize: '16px'
+          }}
         />
         
         <select
           value={categoriaFiltro}
           onChange={(e) => setCategoriaFiltro(e.target.value)}
-          style={{ padding: '10px', border: '1px solid var(--cor-borda)', borderRadius: '6px', minWidth: '150px' }}
+          style={{ 
+            padding: '12px', 
+            border: '1px solid var(--cor-borda)', 
+            borderRadius: '8px', 
+            minWidth: '150px',
+            fontSize: '16px'
+          }}
         >
           <option value="">Todas as categorias</option>
           <option value="frutas">🍎 Frutas</option>
@@ -650,19 +659,58 @@ function VitrinePage() {
 
       {userType === 'distribuidor' && (
         <div className="card" style={{ marginBottom: '20px', textAlign: 'center' }}>
-          <button 
-            onClick={() => window.open('https://maps.google.com', '_blank')}
-            className="btn"
-            style={{ backgroundColor: '#4285f4', fontSize: '1.2em' }}
-          >
-            🗺️ Ver Mapa de Produtos
-          </button>
+          <p style={{ marginBottom: '15px', color: '#666' }}>Ative a localização para buscar por proximidade</p>
+          <div className="btn-group" style={{ display: 'flex', gap: '10px', justifyContent: 'center', flexWrap: 'wrap' }}
+            <button 
+              onClick={() => {
+                if (navigator.geolocation) {
+                  navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                      const lat = position.coords.latitude;
+                      const lng = position.coords.longitude;
+                      window.open(`https://maps.google.com/?q=${lat},${lng}&z=12`, '_blank');
+                    },
+                    () => {
+                      window.open('https://maps.google.com', '_blank');
+                    }
+                  );
+                } else {
+                  window.open('https://maps.google.com', '_blank');
+                }
+              }}
+              className="btn"
+              style={{ backgroundColor: '#4285f4', fontSize: '1em' }}
+            >
+              🗺️ Ver Mapa de Produtos
+            </button>
+            <button 
+              onClick={() => {
+                if (navigator.geolocation) {
+                  navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                      toast.success('Localização ativada! Produtos próximos serão priorizados.');
+                      loadProdutos();
+                    },
+                    () => {
+                      toast.error('Não foi possível acessar sua localização');
+                    }
+                  );
+                } else {
+                  toast.error('Geolocalização não suportada pelo navegador');
+                }
+              }}
+              className="btn"
+              style={{ backgroundColor: '#ff9800', fontSize: '1em' }}
+            >
+              📍 Ativar Localização
+            </button>
+          </div>
         </div>
       )}
 
       {showAddProduct && <AddProductForm />}
 
-      <div style={{
+      <div className="feira-grid" style={{
         display: 'grid',
         gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
         gap: '20px',
