@@ -53,10 +53,10 @@ const PedidoModal = ({ isOpen, onClose, onSave, tipo, funcionarios, produtos, cl
 
   const fetchProdutos = async () => {
     try {
-      const response = await axios.get(`${API_URL}/api/data/items`, {
+      const response = await axios.get(`${API_URL}/api/data/produtos`, {
         headers: { 'x-auth-token': token }
       });
-      setProdutosList(response.data.produto || []);
+      setProdutosList(response.data || []);
     } catch (error) {
       console.error('Erro ao buscar produtos:', error);
     }
