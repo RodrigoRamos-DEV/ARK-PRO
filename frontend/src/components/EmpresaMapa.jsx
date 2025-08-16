@@ -270,7 +270,7 @@ function EmpresaMapa() {
         top: '10px',
         left: '10px',
         right: '10px',
-        zIndex: 1000,
+        zIndex: 500,
         background: 'white',
         padding: '15px',
         borderRadius: '10px',
