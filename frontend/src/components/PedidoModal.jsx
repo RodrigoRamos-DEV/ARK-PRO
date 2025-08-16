@@ -288,7 +288,7 @@ const PedidoModal = ({ isOpen, onClose, onSave, tipo, funcionarios, produtos, cl
                 onChange={(e) => handleClienteChange(e.target.value)}
                 required
               >
-                <option value="">Selecione</option>
+                <option value="">{tipo === 'venda' ? 'Selecione um cliente' : 'Selecione um fornecedor'}</option>
                 {clientesList.map(cliente => (
                   <option key={cliente.id} value={cliente.name}>{cliente.name}</option>
                 ))}
