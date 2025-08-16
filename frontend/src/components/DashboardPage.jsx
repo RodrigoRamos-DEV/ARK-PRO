@@ -161,9 +161,48 @@ function DashboardPage() {
     <div>
       <PushNotifications />
       <ClientNotifications />
+      {/* Ações Rápidas */}
+      <div className="card" style={{marginBottom: '20px'}}>
+        <h3 style={{marginBottom: '20px'}}>⚡ Ações Rápidas</h3>
+        <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '15px'}}>
+          <button className="btn" onClick={() => {
+            navigate('/cadastro');
+            setTimeout(() => {
+              const event = new CustomEvent('openModal', { detail: { type: 'produtos' } });
+              window.dispatchEvent(event);
+            }, 100);
+          }} style={{display: 'flex', alignItems: 'center', gap: '6px', justifyContent: 'center'}}>
+            <Icons.Package /> Novo Produto
+          </button>
+          <button className="btn" onClick={() => {
+            navigate('/cadastro');
+            setTimeout(() => {
+              const event = new CustomEvent('openModal', { detail: { type: 'clientes' } });
+              window.dispatchEvent(event);
+            }, 100);
+          }} style={{display: 'flex', alignItems: 'center', gap: '6px', justifyContent: 'center'}}>
+            <Icons.Users /> Novo Cliente
+          </button>
+          <button className="btn" onClick={() => {
+            navigate('/lancamentos');
+            setTimeout(() => {
+              const event = new CustomEvent('openNewTransaction');
+              window.dispatchEvent(event);
+            }, 100);
+          }} style={{display: 'flex', alignItems: 'center', gap: '6px', justifyContent: 'center'}}>
+            <Icons.DollarSign /> Novo Lançamento
+          </button>
+          <button className="btn" onClick={() => navigate('/relatorios')} style={{display: 'flex', alignItems: 'center', gap: '6px', justifyContent: 'center'}}>
+            <Icons.Chart /> Relatórios
+          </button>
+          <button className="btn" onClick={() => navigate('/profile')} style={{display: 'flex', alignItems: 'center', gap: '6px', justifyContent: 'center'}}>
+            <Icons.Settings /> Configurações
+          </button>
+        </div>
+      </div>
+
       {/* Header com controles */}
       <div style={{display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '20px'}}>
-
         <select
           value={periodo}
           onChange={(e) => setPeriodo(e.target.value)}
@@ -339,46 +378,7 @@ function DashboardPage() {
         </div>
       </div>
 
-      {/* Atalhos Rápidos */}
-      <div className="card" style={{marginTop: '30px'}}>
-        <h3 style={{marginBottom: '20px'}}>⚡ Ações Rápidas</h3>
-        <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '15px'}}>
-          <button className="btn" onClick={() => {
-            navigate('/cadastro');
-            setTimeout(() => {
-              const event = new CustomEvent('openModal', { detail: { type: 'produtos' } });
-              window.dispatchEvent(event);
-            }, 100);
-          }} style={{display: 'flex', alignItems: 'center', gap: '6px', justifyContent: 'center'}}>
-            <Icons.Package /> Novo Produto
-          </button>
-          <button className="btn" onClick={() => {
-            navigate('/cadastro');
-            setTimeout(() => {
-              const event = new CustomEvent('openModal', { detail: { type: 'clientes' } });
-              window.dispatchEvent(event);
-            }, 100);
-          }} style={{display: 'flex', alignItems: 'center', gap: '6px', justifyContent: 'center'}}>
-            <Icons.Users /> Novo Cliente
-          </button>
-          <button className="btn" onClick={() => {
-            navigate('/lancamentos');
-            setTimeout(() => {
-              const event = new CustomEvent('openNewTransaction');
-              window.dispatchEvent(event);
-            }, 100);
-          }} style={{display: 'flex', alignItems: 'center', gap: '6px', justifyContent: 'center'}}>
-            <Icons.DollarSign /> Novo Lançamento
-          </button>
 
-          <button className="btn" onClick={() => navigate('/relatorios')} style={{display: 'flex', alignItems: 'center', gap: '6px', justifyContent: 'center'}}>
-            <Icons.Chart /> Relatórios
-          </button>
-          <button className="btn" onClick={() => navigate('/profile')} style={{display: 'flex', alignItems: 'center', gap: '6px', justifyContent: 'center'}}>
-            <Icons.Settings /> Configurações
-          </button>
-        </div>
-      </div>
     </div>
   );
 }
