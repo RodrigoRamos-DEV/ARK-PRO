@@ -4,7 +4,6 @@ import axios from 'axios';
 import API_URL from '../apiConfig';
 import ClientNotifications from './ClientNotifications';
 import { feiraService } from '../feiraService';
-import '../css/feira-responsive.css';
 
 function VitrinePage() {
   const [userType, setUserType] = useState('');
@@ -438,7 +437,7 @@ function VitrinePage() {
   };
 
   const ProductCard = ({ produto }) => (
-    <div className="card product-card" style={{ 
+    <div className="card" style={{ 
       width: '280px', 
       margin: '0', 
       padding: '0',
@@ -516,7 +515,7 @@ function VitrinePage() {
             <p style={{ margin: '4px 0', fontSize: '0.85em', color: '#888' }}>
               Por: {produto.produtor}
             </p>
-            <div className="product-actions" style={{ display: 'flex', gap: '8px', marginTop: '12px' }}
+            <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
               <a 
                 href={`https://wa.me/55${produto.whatsapp}?text=Olá! Vi seu produto ${produto.nome} na vitrine e tenho interesse.`}
                 target="_blank"
@@ -550,7 +549,7 @@ function VitrinePage() {
         )}
         
         {userType === 'produtor' && (
-          <div className="product-actions" style={{ display: 'flex', gap: '8px', marginTop: '12px' }}
+          <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
             <button 
               onClick={() => editProduto(produto)}
               className="btn"
@@ -601,7 +600,7 @@ function VitrinePage() {
   return (
     <div>
       <ClientNotifications />
-      <div className="feira-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
         <h2>🏪 Feira {userType === 'produtor' ? 'dos Meus Produtos' : 'de Produtos'}</h2>
         {userType === 'produtor' && (
           <button 
@@ -614,12 +613,12 @@ function VitrinePage() {
       </div>
       
       {/* Filtros */}
-      <div className="feira-filters" style={{ 
+      <div style={{ 
         display: 'flex', 
         gap: '15px', 
         marginBottom: '20px', 
         flexWrap: 'wrap'
-      }}
+      }}>
         <input
           type="text"
           placeholder="Buscar produtos..."
@@ -660,7 +659,7 @@ function VitrinePage() {
       {userType === 'distribuidor' && (
         <div className="card" style={{ marginBottom: '20px', textAlign: 'center' }}>
           <p style={{ marginBottom: '15px', color: '#666' }}>Ative a localização para buscar por proximidade</p>
-          <div className="btn-group" style={{ display: 'flex', gap: '10px', justifyContent: 'center', flexWrap: 'wrap' }}
+          <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', flexWrap: 'wrap' }}>
             <button 
               onClick={() => {
                 if (navigator.geolocation) {
@@ -710,7 +709,7 @@ function VitrinePage() {
 
       {showAddProduct && <AddProductForm />}
 
-      <div className="feira-grid" style={{
+      <div style={{
         display: 'grid',
         gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
         gap: '20px',
