@@ -1,4 +1,5 @@
 import React from 'react';
+import { Icons } from './Icons';
 
 function ConfirmModal({ isOpen, onClose, onConfirm, title, children }) {
   if (!isOpen) {
@@ -31,11 +32,11 @@ function ConfirmModal({ isOpen, onClose, onConfirm, title, children }) {
         <h3 style={{ marginTop: 0 }}>{title || 'Confirmar Ação'}</h3>
         <p>{children}</p>
         <div style={buttonContainerStyle}>
-          <button onClick={onClose} className="btn" style={{ backgroundColor: '#888' }}>
-            Cancelar
+          <button onClick={onClose} className="btn" style={{ backgroundColor: '#888', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <Icons.Cancel /> Cancelar
           </button>
-          <button onClick={onConfirm} className="btn" style={{ backgroundColor: 'var(--cor-erro)' }}>
-            Confirmar
+          <button onClick={onConfirm} className="btn" style={{ backgroundColor: 'var(--cor-erro)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <Icons.Check /> Confirmar
           </button>
         </div>
       </div>

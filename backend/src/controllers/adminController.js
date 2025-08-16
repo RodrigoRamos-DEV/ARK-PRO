@@ -3,7 +3,7 @@ const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
 
 const ensureAdmin = (req, res, next) => {
-    if (req.user.role !== 'admin') {
+    if (req.user.role !== 'admin' && req.user.role !== 'funcionario') {
         return res.status(403).json({ error: 'Acesso negado. Apenas administradores.' });
     }
     next();
@@ -17,8 +17,9 @@ const getAllClients = async (req, res) => {
                 c.inscricao_municipal, c.responsavel_nome, c.business_phone, c.contact_phone,
                 c.endereco_logradouro, c.endereco_numero, c.endereco_bairro,
                 c.endereco_cidade, c.endereco_uf, c.endereco_cep,
-                c.regime_tributario, c.license_expires_at, c.partner_id,
-                p.name as partner_name,
+                c.regime_tributario, c.license_expires_at, c.vendedor_id,
+                COALESCE(c.client_type, 'produtor') as client_type,
+                v.name as partner_name,
                 CASE
                     WHEN c.license_expires_at < CURRENT_DATE THEN 'Vencido'
                     WHEN c.license_expires_at - CURRENT_DATE <= 5 THEN 'A Vencer'
@@ -26,7 +27,7 @@ const getAllClients = async (req, res) => {
                 END AS license_status,
                 (SELECT u.email FROM users u WHERE u.client_id = c.id LIMIT 1) as email
             FROM clients c
-            LEFT JOIN partners p ON c.partner_id = p.id
+            LEFT JOIN vendedores v ON c.vendedor_id = v.id
             ORDER BY c.company_name;
         `;
         const result = await db.query(query);
@@ -40,9 +41,9 @@ const getAllClients = async (req, res) => {
 const createClient = async (req, res) => {
     const { 
         companyName, razao_social, cnpj, inscricao_estadual, inscricao_municipal,
-        responsavel_nome, telefone, endereco_logradouro, endereco_numero,
+        responsavel_nome, email, telefone, endereco_logradouro, endereco_numero,
         endereco_bairro, endereco_cidade, endereco_uf, endereco_cep,
-        regime_tributario, licenseExpiresAt, partnerId
+        regime_tributario, licenseExpiresAt, vendedorId, clientType
     } = req.body;
 
     if (!companyName || !licenseExpiresAt || !razao_social || !responsavel_nome || !telefone) {
@@ -55,25 +56,24 @@ const createClient = async (req, res) => {
         const newClientResult = await client.query(
             `INSERT INTO clients (
                 company_name, razao_social, cnpj, inscricao_estadual, inscricao_municipal,
-                responsavel_nome, business_phone, endereco_logradouro, endereco_numero,
+                responsavel_nome, email, business_phone, endereco_logradouro, endereco_numero,
                 endereco_bairro, endereco_cidade, endereco_uf, endereco_cep,
-                regime_tributario, license_expires_at, license_status, partner_id
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, 'Ativo', $16) RETURNING id`,
+                regime_tributario, license_expires_at, license_status, vendedor_id, client_type
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, 'Ativo', $17, $18) RETURNING id`,
             [
                 companyName, razao_social, cnpj || null, inscricao_estadual, inscricao_municipal,
-                responsavel_nome, telefone, endereco_logradouro, endereco_numero,
+                responsavel_nome, email, telefone, endereco_logradouro, endereco_numero,
                 endereco_bairro, endereco_cidade, endereco_uf, endereco_cep,
-                regime_tributario, licenseExpiresAt, partnerId || null
+                regime_tributario, licenseExpiresAt, vendedorId || null, clientType || 'produtor'
             ]
         );
         const newClientId = newClientResult.rows[0].id;
         const registrationToken = crypto.randomBytes(32).toString('hex');
-        const tokenHash = crypto.createHash('sha256').update(registrationToken).digest('hex');
         const expiresAt = new Date();
         expiresAt.setDate(expiresAt.getDate() + 7);
         await client.query(
             'INSERT INTO registration_tokens (client_id, token_hash, expires_at) VALUES ($1, $2, $3)',
-            [newClientId, tokenHash, expiresAt]
+            [newClientId, registrationToken, expiresAt]
         );
         
         await client.query('COMMIT');
@@ -97,24 +97,24 @@ const updateClient = async (req, res) => {
     const { id } = req.params;
     const { 
         companyName, razao_social, cnpj, inscricao_estadual, inscricao_municipal,
-        responsavel_nome, telefone, endereco_logradouro, endereco_numero,
+        responsavel_nome, email, telefone, endereco_logradouro, endereco_numero,
         endereco_bairro, endereco_cidade, endereco_uf, endereco_cep,
-        regime_tributario, licenseStatus, licenseExpiresAt, partnerId
+        regime_tributario, licenseStatus, licenseExpiresAt, vendedorId, clientType
     } = req.body;
     try {
         const result = await db.query(
             `UPDATE clients SET 
                 company_name = $1, razao_social = $2, cnpj = $3, inscricao_estadual = $4, 
-                inscricao_municipal = $5, responsavel_nome = $6, business_phone = $7, 
-                endereco_logradouro = $8, endereco_numero = $9, endereco_bairro = $10, 
-                endereco_cidade = $11, endereco_uf = $12, endereco_cep = $13, 
-                regime_tributario = $14, license_status = $15, license_expires_at = $16, partner_id = $17 
-            WHERE id = $18 RETURNING *`,
+                inscricao_municipal = $5, responsavel_nome = $6, email = $7, business_phone = $8, 
+                endereco_logradouro = $9, endereco_numero = $10, endereco_bairro = $11, 
+                endereco_cidade = $12, endereco_uf = $13, endereco_cep = $14, 
+                regime_tributario = $15, license_status = $16, license_expires_at = $17, vendedor_id = $18, client_type = $19 
+            WHERE id = $20 RETURNING *`,
             [
                 companyName, razao_social, cnpj || null, inscricao_estadual, inscricao_municipal,
-                responsavel_nome, telefone, endereco_logradouro, endereco_numero,
+                responsavel_nome, email, telefone, endereco_logradouro, endereco_numero,
                 endereco_bairro, endereco_cidade, endereco_uf, endereco_cep,
-                regime_tributario, licenseStatus, licenseExpiresAt, partnerId || null, id
+                regime_tributario, licenseStatus, licenseExpiresAt, vendedorId || null, clientType || 'produtor', id
             ]
         );
         if (result.rowCount === 0) {
@@ -218,6 +218,40 @@ const saveReportTemplate = async (req, res) => {
     }
 };
 
+const getClientToken = async (req, res) => {
+    const { id } = req.params;
+    try {
+        const result = await db.query(
+            'SELECT token_hash FROM registration_tokens WHERE client_id = $1 AND expires_at > NOW() LIMIT 1',
+            [id]
+        );
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'Token não encontrado ou expirado.' });
+        }
+        res.json({ registrationToken: result.rows[0].token_hash });
+    } catch (err) {
+        console.error(err.message);
+        res.status(500).json({ error: 'Erro no servidor ao buscar token.' });
+    }
+};
+
+const getClientProfile = async (req, res) => {
+    const { id } = req.params;
+    try {
+        const result = await db.query(
+            'SELECT contact_phone FROM clients WHERE id = $1',
+            [id]
+        );
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'Cliente não encontrado.' });
+        }
+        res.json({ contact_phone: result.rows[0].contact_phone });
+    } catch (err) {
+        console.error(err.message);
+        res.status(500).json({ error: 'Erro no servidor ao buscar perfil.' });
+    }
+};
+
 module.exports = {
     ensureAdmin,
     getAllClients,
@@ -226,5 +260,7 @@ module.exports = {
     deleteClient,
     renewClientLicense,
     getDashboardStats,
-    saveReportTemplate
+    saveReportTemplate,
+    getClientToken,
+    getClientProfile
 };

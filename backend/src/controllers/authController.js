@@ -8,7 +8,7 @@ exports.login = async (req, res) => {
   const { email, password } = req.body;
   try {
     const userResult = await db.query(
-        'SELECT u.*, c.company_name, c.license_expires_at, c.license_status FROM users u LEFT JOIN clients c ON u.client_id = c.id WHERE u.email = $1',
+        'SELECT u.*, c.company_name, c.license_expires_at, c.license_status, COALESCE(c.client_type, \'produtor\') as client_type FROM users u LEFT JOIN clients c ON u.client_id = c.id WHERE u.email = $1',
         [email]
     );
 
@@ -42,7 +42,8 @@ exports.login = async (req, res) => {
         user: {
             id: user.id,
             clientId: user.client_id,
-            role: user.role
+            role: user.role,
+            clientType: user.client_type
         }
     };
     if (user.role === 'funcionario') {
@@ -76,8 +77,7 @@ exports.registerClient = async (req, res) => {
     try {
         await client.query('BEGIN');
         
-        const tokenHash = crypto.createHash('sha256').update(registrationToken).digest('hex');
-        const tokenResult = await client.query( 'SELECT * FROM registration_tokens WHERE token_hash = $1 AND is_used = FALSE AND expires_at > NOW()', [tokenHash] );
+        const tokenResult = await client.query( 'SELECT * FROM registration_tokens WHERE token_hash = $1 AND is_used = FALSE AND expires_at > NOW()', [registrationToken] );
         if (tokenResult.rows.length === 0) { throw new Error("Token de registo inválido, expirado ou já utilizado."); }
         
         const tokenData = tokenResult.rows[0];

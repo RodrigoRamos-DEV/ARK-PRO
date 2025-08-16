@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { toast } from 'react-toastify';
 import API_URL from '../apiConfig';
+import { Icons } from './Icons';
 
 const formatCurrency = (value) => {
     if (isNaN(value) || value === null || value === '') return '';
@@ -19,6 +20,8 @@ function TransactionModal({ isOpen, onClose, onSave, transactionToEdit, initialT
     const [funcionarios, setFuncionarios] = useState([]);
     const [tipo, setTipo] = useState(initialType);
     const [attachmentFile, setAttachmentFile] = useState(null);
+    const [isLoading, setIsLoading] = useState(false);
+    const [errors, setErrors] = useState({});
 
     const initialRowState = {
         employee_id: defaultEmployeeId || '',
@@ -36,6 +39,23 @@ function TransactionModal({ isOpen, onClose, onSave, transactionToEdit, initialT
     useEffect(() => {
         if (isOpen) {
             setAttachmentFile(null);
+            
+            // Focar no primeiro campo quando modal abre
+            const timer = setTimeout(() => {
+                const firstInput = document.querySelector('select[name="employee_id"]');
+                if (firstInput) firstInput.focus();
+            }, 100);
+            
+            // Adicionar listener para ESC
+            const handleEsc = (e) => {
+                if (e.key === 'Escape') onClose();
+            };
+            document.addEventListener('keydown', handleEsc);
+            
+            return () => {
+                clearTimeout(timer);
+                document.removeEventListener('keydown', handleEsc);
+            };
             const fetchEmployees = async () => {
                 const token = localStorage.getItem('token');
                 try {
@@ -79,6 +99,14 @@ function TransactionModal({ isOpen, onClose, onSave, transactionToEdit, initialT
     const handleRowChange = (index, e) => {
         const { name, value } = e.target;
         const newRows = [...rows];
+        const newErrors = { ...errors };
+        
+        // Limpar erro do campo quando usuário começa a digitar
+        if (newErrors[`${index}_${name}`]) {
+            delete newErrors[`${index}_${name}`];
+            setErrors(newErrors);
+        }
+        
         if (name === 'unit_price') {
             const digitsOnly = value.replace(/\D/g, '');
             const realValue = Number(digitsOnly) / 100;
@@ -86,6 +114,15 @@ function TransactionModal({ isOpen, onClose, onSave, transactionToEdit, initialT
         } else {
             newRows[index][name] = value;
         }
+        
+        // Validação em tempo real
+        if (name === 'description' && value) {
+            if (!items.produto.some(p => p.name === value)) {
+                newErrors[`${index}_${name}`] = 'Produto não cadastrado';
+                setErrors(newErrors);
+            }
+        }
+        
         setRows(newRows);
     };
 
@@ -121,6 +158,8 @@ function TransactionModal({ isOpen, onClose, onSave, transactionToEdit, initialT
 
     const handleSubmit = async (e) => {
         e.preventDefault();
+        setIsLoading(true);
+        setErrors({});
         const token = localStorage.getItem('token');
         const TRANSACTIONS_API_URL = `${DATA_API_URL}/transactions`;
         
@@ -128,6 +167,17 @@ function TransactionModal({ isOpen, onClose, onSave, transactionToEdit, initialT
             for (const row of rows) {
                 if (!row.employee_id) {
                     toast.error("Por favor, selecione um funcionário para cada lançamento.");
+                    return;
+                }
+                // Validar se produto existe
+                if (row.description && !items.produto.some(p => p.name === row.description)) {
+                    toast.error(`Produto '${row.description}' não está cadastrado. Cadastre-o primeiro.`);
+                    return;
+                }
+                // Validar se cliente/fornecedor existe
+                const categoryItems = tipo === 'venda' ? items.comprador : items.fornecedor;
+                if (row.category && !categoryItems.some(c => c.name === row.category)) {
+                    toast.error(`${tipo === 'venda' ? 'Cliente' : 'Fornecedor'} '${row.category}' não está cadastrado.`);
                     return;
                 }
             }
@@ -163,7 +213,10 @@ function TransactionModal({ isOpen, onClose, onSave, transactionToEdit, initialT
             
             onClose();
         } catch (err) {
+            setErrors({ submit: err.response?.data?.error || 'Erro ao salvar o lançamento.' });
             toast.error(err.response?.data?.error || 'Erro ao salvar o lançamento.');
+        } finally {
+            setIsLoading(false);
         }
     };
 
@@ -172,25 +225,25 @@ function TransactionModal({ isOpen, onClose, onSave, transactionToEdit, initialT
         : '1.5fr 1.2fr 0.8fr 2fr 2fr 1.2fr 1.2fr 1.5fr 0.5fr';
 
     return (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.7)', zIndex: 1000, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-            <datalist id="description-list">{items[tipo === 'venda' ? 'produto' : 'compra'].map(item => <option key={item.id} value={item.name} />)}</datalist>
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.7)', zIndex: 1000, display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '10px' }}>
+            <datalist id="description-list">{items.produto.map(item => <option key={item.id} value={item.name} />)}</datalist>
             <datalist id="category-list">{items[tipo === 'venda' ? 'comprador' : 'fornecedor'].map(item => <option key={item.id} value={item.name} />)}</datalist>
 
-            <div style={{ width: '90%', maxWidth: '1100px' }} className="card">
+            <div style={{ width: '95%', maxWidth: '1100px', maxHeight: '90vh', overflowY: 'auto' }} className="card">
                 <h2>{transactionToEdit ? 'Editar' : 'Nova'} {tipo === 'venda' ? 'Venda' : 'Gasto'}</h2>
 
                 <form onSubmit={handleSubmit}>
                     <div style={{ maxHeight: '400px', overflowY: 'auto', paddingRight: '15px' }}>
                         
                         <div style={{ display: 'grid', gridTemplateColumns: gridColumns, gap: '10px', fontWeight: 'bold', marginBottom: '5px', color: 'var(--cor-texto-label)', fontSize: '0.9em' }}>
-                            <div style={{ textAlign: 'center' }}>Funcionário</div>
-                            <div style={{ textAlign: 'center' }}>Data</div>
-                            <div style={{ textAlign: 'center' }}>Qtd</div>
-                            <div style={{ textAlign: 'center' }}>{tipo === 'venda' ? 'Produto' : 'Compra'}</div>
+                            <div style={{ textAlign: 'center' }}>Funcionário <span style={{ color: 'var(--cor-erro)' }}>*</span></div>
+                            <div style={{ textAlign: 'center' }}>Data <span style={{ color: 'var(--cor-erro)' }}>*</span></div>
+                            <div style={{ textAlign: 'center' }}>Qtd <span style={{ color: 'var(--cor-erro)' }}>*</span></div>
+                            <div style={{ textAlign: 'center' }}>{tipo === 'venda' ? 'Produto' : 'Compra'} <span style={{ color: 'var(--cor-erro)' }}>*</span></div>
                             <div style={{ textAlign: 'center' }}>{tipo === 'venda' ? 'Comprador' : 'Fornecedor'}</div>
-                            <div style={{ textAlign: 'center' }}>Valor Unitário</div>
+                            <div style={{ textAlign: 'center' }}>Valor Unitário <span style={{ color: 'var(--cor-erro)' }}>*</span></div>
                             <div style={{ textAlign: 'center' }}>Total</div>
-                            <div style={{ textAlign: 'center' }}>Status</div>
+                            <div style={{ textAlign: 'center' }}>Status <span style={{ color: 'var(--cor-erro)' }}>*</span></div>
                             {!transactionToEdit && <div />}
                         </div>
 
@@ -204,7 +257,26 @@ function TransactionModal({ isOpen, onClose, onSave, transactionToEdit, initialT
                                     </select>
                                     <input name="transaction_date" type="date" value={row.transaction_date} onChange={(e) => handleRowChange(index, e)} required />
                                     <input name="quantity" type="number" placeholder="Qtd" step="0.01" value={row.quantity} onChange={(e) => handleRowChange(index, e)} required />
-                                    <input name="description" placeholder={tipo === 'venda' ? 'Digite o produto' : 'Digite a compra'} value={row.description} onChange={(e) => handleRowChange(index, e)} onBlur={() => handleDescriptionBlur(index)} list="description-list" required />
+                                    <div style={{ position: 'relative' }}>
+                                        <input 
+                                            name="description" 
+                                            placeholder={tipo === 'venda' ? 'Digite o produto' : 'Digite a compra'} 
+                                            value={row.description} 
+                                            onChange={(e) => handleRowChange(index, e)} 
+                                            onBlur={() => handleDescriptionBlur(index)} 
+                                            list="description-list" 
+                                            required 
+                                            style={{ 
+                                                borderColor: errors[`${index}_description`] ? 'var(--cor-erro)' : 'var(--cor-borda)',
+                                                borderWidth: errors[`${index}_description`] ? '2px' : '1px'
+                                            }}
+                                        />
+                                        {errors[`${index}_description`] && (
+                                            <div style={{ position: 'absolute', top: '100%', left: 0, fontSize: '0.8em', color: 'var(--cor-erro)', marginTop: '2px' }}>
+                                                {errors[`${index}_description`]}
+                                            </div>
+                                        )}
+                                    </div>
                                     <input name="category" placeholder={tipo === 'venda' ? 'Selecione o comprador' : 'Selecione o fornecedor'} value={row.category} onChange={(e) => handleRowChange(index, e)} onBlur={() => handleDescriptionBlur(index)} list="category-list" />
                                     <input type="text" name="unit_price" placeholder="R$ 0,00" value={formatCurrency(row.unit_price)} onChange={(e) => handleRowChange(index, e)} required />
                                     <input name="total" placeholder="Total" value={formatCurrency(total)} disabled style={{ backgroundColor: 'var(--cor-borda)' }} />
@@ -213,7 +285,9 @@ function TransactionModal({ isOpen, onClose, onSave, transactionToEdit, initialT
                                         <option value="Pago">Pago</option>
                                     </select>
                                     {!transactionToEdit && (
-                                        <button type="button" onClick={() => removeRow(index)} className="btn" style={{ backgroundColor: 'transparent', color: 'var(--cor-erro)', padding: '5px', width: 'auto', border: 'none' }}>✖</button>
+                                        <button type="button" onClick={() => removeRow(index)} className="btn" style={{ backgroundColor: 'transparent', color: 'var(--cor-erro)', padding: '5px', width: 'auto', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                            <Icons.Delete />
+                                        </button>
                                     )}
                                 </div>
                             );
@@ -228,11 +302,22 @@ function TransactionModal({ isOpen, onClose, onSave, transactionToEdit, initialT
                     )}
 
                     {!transactionToEdit && (
-                        <button type="button" onClick={addRow} className="btn" style={{ width: 'auto', marginTop: '10px' }}>Adicionar Linha</button>
+                        <button type="button" onClick={addRow} className="btn" style={{ width: 'auto', marginTop: '10px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <Icons.Plus /> Adicionar Linha
+                        </button>
+                    )}
+                    {errors.submit && (
+                        <div style={{ color: 'var(--cor-erro)', marginTop: '10px', padding: '10px', backgroundColor: 'rgba(220, 38, 38, 0.1)', borderRadius: '5px' }}>
+                            {errors.submit}
+                        </div>
                     )}
                     <div style={{ marginTop: '20px', display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
-                        <button type="button" onClick={onClose} className="btn" style={{ backgroundColor: '#888', width: 'auto' }}>Cancelar</button>
-                        <button type="submit" className="btn" style={{ width: 'auto' }}>Salvar</button>
+                        <button type="button" onClick={onClose} className="btn" disabled={isLoading} style={{ backgroundColor: '#888', width: 'auto', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <Icons.Cancel /> Cancelar
+                        </button>
+                        <button type="submit" className="btn" disabled={isLoading} style={{ width: 'auto', opacity: isLoading ? 0.7 : 1, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            {isLoading ? <><Icons.Clock /> Salvando...</> : <><Icons.Save /> Salvar</>}
+                        </button>
                     </div>
                 </form>
             </div>

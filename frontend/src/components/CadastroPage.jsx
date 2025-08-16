@@ -1,13 +1,19 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import CadastroNavbar from './CadastroNavbar';
+import ProdutoManager from './ProdutoManager';
+import ClienteManager from './ClienteManager';
+import FornecedorManager from './FornecedorManager';
 import FuncionarioManager from './FuncionarioManager';
-import ItemManager from './ItemManager';
+
+
+
 
 // Componente Modal genérico
 const ManagementModal = ({ isOpen, onClose, title, children }) => {
     if (!isOpen) return null;
     return (
         <div style={{position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.7)', zIndex: 1000, display: 'flex', justifyContent: 'center', alignItems: 'center'}}>
-            <div style={{width: '90%', maxWidth: '500px'}} className="card">
+            <div style={{width: '95%', maxWidth: '1000px', maxHeight: '90vh', overflowY: 'auto', position: 'relative'}} className="card">
                 <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px'}}>
                     <h2 style={{margin: 0}}>{title}</h2>
                     <button onClick={onClose} style={{background: 'none', border: 'none', fontSize: '1.5em', cursor: 'pointer', color: 'var(--cor-texto)'}}>×</button>
@@ -21,8 +27,24 @@ const ManagementModal = ({ isOpen, onClose, title, children }) => {
 function CadastroPage() {
   const [modalState, setModalState] = useState({ isOpen: false, type: '', title: '' });
 
-  const openModal = (type, title) => {
-    setModalState({ isOpen: true, type, title });
+  useEffect(() => {
+    const handleOpenModal = (event) => {
+      const { type } = event.detail;
+      handleNavClick(type);
+    };
+
+    window.addEventListener('openModal', handleOpenModal);
+    return () => window.removeEventListener('openModal', handleOpenModal);
+  }, []);
+
+  const handleNavClick = (type) => {
+    const titles = {
+      produtos: 'Produtos',
+      clientes: 'Clientes',
+      fornecedores: 'Fornecedores', 
+      funcionarios: 'Funcionários'
+    };
+    setModalState({ isOpen: true, type, title: titles[type] });
   };
 
   const closeModal = () => {
@@ -30,26 +52,32 @@ function CadastroPage() {
   };
 
   const renderModalContent = () => {
-      const { type, title } = modalState;
-      if (type === 'funcionarios') {
+      const { type } = modalState;
+      switch(type) {
+        case 'produtos':
+          return <ProdutoManager />;
+        case 'funcionarios':
           return <FuncionarioManager />;
+        case 'clientes':
+          return <ClienteManager />;
+        case 'fornecedores':
+          return <FornecedorManager />;
+
+        default:
+          return null;
       }
-      if (['produto', 'comprador', 'compra', 'fornecedor'].includes(type)) {
-          return <ItemManager itemType={type} title={title} />;
-      }
-      return null;
   };
 
   return (
     <div>
-      <div className="card">
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '20px', justifyContent: 'center' }}>
-          <button className="btn" onClick={() => openModal('produto', 'Gerenciar Produtos')}>Gerenciar Produtos</button>
-          <button className="btn" onClick={() => openModal('comprador', 'Gerenciar Compradores')}>Gerenciar Compradores</button>
-          <button className="btn" onClick={() => openModal('compra', 'Gerenciar Compras')}>Gerenciar Compras</button>
-          <button className="btn" onClick={() => openModal('fornecedor', 'Gerenciar Fornecedores')}>Gerenciar Fornecedores</button>
-          <button className="btn" onClick={() => openModal('funcionarios', 'Gerenciar Funcionários')}>Gerenciar Funcionários</button>
-        </div>
+      <CadastroNavbar 
+        onItemClick={handleNavClick}
+        activeItem={modalState.isOpen ? modalState.type : null}
+      />
+      
+      <div className="card" style={{textAlign: 'center', padding: '40px'}}>
+        <h3 style={{color: 'var(--cor-texto-secundario)', marginBottom: '10px'}}>Sistema de Cadastros</h3>
+        <p style={{color: 'var(--cor-texto-secundario)'}}>Selecione uma opção acima para gerenciar seus cadastros</p>
       </div>
 
       <ManagementModal

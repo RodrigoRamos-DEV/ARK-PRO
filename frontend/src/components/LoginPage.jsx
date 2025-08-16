@@ -18,7 +18,7 @@ function LoginPage() {
             if (user?.role === 'admin') {
                 navigate('/admin');
             } else {
-                navigate('/dashboard');
+                navigate('/client-router');
             }
         }
     }, [navigate]);
@@ -35,7 +35,7 @@ function LoginPage() {
             if (response.data.user.role === 'admin') {
                 navigate('/admin');
             } else {
-                navigate('/dashboard');
+                navigate('/client-router');
             }
         } catch (err) {
             toast.error(err.response?.data?.msg || 'Erro ao conectar ao servidor.');
