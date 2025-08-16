@@ -49,8 +49,12 @@ async function runMigrations() {
     console.log('3. Reiniciar o servidor');
 
   } catch (error) {
-    console.error('❌ Erro na migração:', error);
-    process.exit(1);
+    if (error.message.includes('already exists')) {
+      console.log('ℹ️ Tabelas já existem, pulando migração...');
+    } else {
+      console.error('❌ Erro na migração:', error);
+      process.exit(1);
+    }
   } finally {
     await pool.end();
   }
