@@ -230,7 +230,7 @@ function TransactionModal({ isOpen, onClose, onSave, transactionToEdit, initialT
             <datalist id="category-list">{items[tipo === 'venda' ? 'comprador' : 'fornecedor'].map(item => <option key={item.id} value={item.name} />)}</datalist>
 
             <div style={{ width: '95%', maxWidth: '1100px', maxHeight: '90vh', overflowY: 'auto' }} className="card">
-                <h2>{transactionToEdit ? 'Editar' : 'Nova'} {tipo === 'venda' ? 'Venda' : 'Gasto'}</h2>
+                <h2>{transactionToEdit ? 'Editar' : 'Nova'} {tipo === 'venda' ? 'Venda' : 'Compra'}</h2>
 
                 <form onSubmit={handleSubmit}>
                     <div style={{ maxHeight: '400px', overflowY: 'auto', paddingRight: '15px' }}>

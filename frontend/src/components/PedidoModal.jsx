@@ -63,15 +63,8 @@ const PedidoModal = ({ isOpen, onClose, onSave, tipo, funcionarios, produtos, cl
   };
 
   const fetchClientes = async () => {
-    try {
-      const response = await axios.get(`${API_URL}/api/data/items`, {
-        headers: { 'x-auth-token': token }
-      });
-      const tipoCliente = tipo === 'venda' ? 'comprador' : 'fornecedor';
-      setClientesList(response.data[tipoCliente] || []);
-    } catch (error) {
-      console.error('Erro ao buscar clientes:', error);
-    }
+    // Usar a prop clientes que já vem filtrada do componente pai
+    setClientesList(clientes || []);
   };
 
   const handleProdutoChange = async (produtoNome) => {
