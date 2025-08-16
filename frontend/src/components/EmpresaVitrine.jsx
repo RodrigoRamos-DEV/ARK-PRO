@@ -74,22 +74,29 @@ function EmpresaVitrine() {
     try {
       // Tentar buscar da API primeiro
       const token = localStorage.getItem('token');
-      const response = await fetch(`${API_URL}/api/feira/produtos`, {
+      console.log('EmpresaVitrine: Buscando produtos da API...');
+      const response = await fetch(`${process.env.REACT_APP_API_URL || 'https://ark-pro-backend.onrender.com'}/api/feira/produtos`, {
         headers: { 'x-auth-token': token }
       });
       
+      console.log('EmpresaVitrine: Response status:', response.status);
+      
       if (response.ok) {
         const apiProdutos = await response.json();
+        console.log('EmpresaVitrine: Produtos da API:', apiProdutos.length);
         setProdutos(apiProdutos);
       } else {
+        console.log('EmpresaVitrine: API falhou, usando localStorage');
         // Fallback para localStorage
         const vitrineProdutos = JSON.parse(localStorage.getItem('vitrine_produtos') || '[]');
+        console.log('EmpresaVitrine: Produtos localStorage:', vitrineProdutos.length);
         setProdutos(vitrineProdutos);
       }
     } catch (error) {
-      console.log('Erro ao buscar da API, usando localStorage:', error);
+      console.log('EmpresaVitrine: Erro ao buscar da API, usando localStorage:', error);
       // Fallback para localStorage
       const vitrineProdutos = JSON.parse(localStorage.getItem('vitrine_produtos') || '[]');
+      console.log('EmpresaVitrine: Produtos localStorage (catch):', vitrineProdutos.length);
       setProdutos(vitrineProdutos);
     } finally {
       setLoading(false);
