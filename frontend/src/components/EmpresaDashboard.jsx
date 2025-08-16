@@ -34,15 +34,24 @@ function EmpresaDashboard({ theme, toggleTheme }) {
       <PushNotifications />
       {/* Navbar Empresa */}
       <nav className="main-navbar" style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
-        padding: '10px 20px',
+        padding: '0 20px',
+        height: '60px',
         backgroundColor: 'var(--cor-primaria)',
         borderBottom: '1px solid var(--cor-borda)',
-        position: 'relative'
+        zIndex: 1000
       }}>
-        <div className="navbar-left" style={{ flex: '0 0 auto' }}>
+        <div className="navbar-left" style={{ 
+          flex: '0 0 auto',
+          display: 'flex',
+          alignItems: 'center'
+        }}>
           <img 
             src="https://i.postimg.cc/Qd98gFMF/Sistema-ARK.webp" 
             alt="Logo" 
@@ -55,8 +64,10 @@ function EmpresaDashboard({ theme, toggleTheme }) {
         <div className="navbar-center desktop-menu" style={{
           display: window.innerWidth <= 768 ? 'none' : 'flex',
           gap: '20px',
-          flex: '1 1 auto',
-          justifyContent: 'center'
+          flex: '1',
+          justifyContent: 'center',
+          alignItems: 'center',
+          height: '100%'
         }}>
           <button 
             onClick={() => setActiveTab('mapa')}
@@ -125,7 +136,8 @@ function EmpresaDashboard({ theme, toggleTheme }) {
         <div className="navbar-right" style={{
           display: 'flex', 
           alignItems: 'center', 
-          gap: '10px'
+          gap: '10px',
+          flex: '0 0 auto'
         }}>
           <button 
             onClick={toggleTheme} 
@@ -184,7 +196,7 @@ function EmpresaDashboard({ theme, toggleTheme }) {
         {mobileMenuOpen && (
           <div className="mobile-menu" style={{
             position: 'absolute',
-            top: '100%',
+            top: '60px',
             left: 0,
             right: 0,
             backgroundColor: 'var(--cor-fundo)',
@@ -304,7 +316,8 @@ function EmpresaDashboard({ theme, toggleTheme }) {
       <main className="container" style={{
         padding: '20px',
         maxWidth: '100%',
-        margin: '0 auto'
+        margin: '0 auto',
+        marginTop: '60px'
       }}>
         <LicenseWarning />
         <ClientNotifications />

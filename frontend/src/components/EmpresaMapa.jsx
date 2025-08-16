@@ -18,10 +18,25 @@ function EmpresaMapa() {
 
   const fetchProdutos = async () => {
     try {
+      // Tentar buscar da API primeiro
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${process.env.REACT_APP_API_URL || 'https://ark-pro-backend.onrender.com'}/api/feira/produtos`, {
+        headers: { 'x-auth-token': token }
+      });
+      
+      if (response.ok) {
+        const apiProdutos = await response.json();
+        setProdutos(apiProdutos);
+      } else {
+        // Fallback para localStorage
+        const vitrineProdutos = JSON.parse(localStorage.getItem('vitrine_produtos') || '[]');
+        setProdutos(vitrineProdutos);
+      }
+    } catch (error) {
+      console.log('Erro ao buscar da API, usando localStorage:', error);
+      // Fallback para localStorage
       const vitrineProdutos = JSON.parse(localStorage.getItem('vitrine_produtos') || '[]');
       setProdutos(vitrineProdutos);
-    } catch (error) {
-      toast.error('Erro ao carregar produtos');
     } finally {
       setLoading(false);
     }
