@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import axios from 'axios';
 import { toast } from 'react-toastify';
 import ConfirmModal from './ConfirmModal';
@@ -56,9 +57,9 @@ const ProdutoModal = ({ isOpen, onClose, produto, onSave }) => {
 
   if (!isOpen) return null;
 
-  return (
-    <div style={{position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.7)', zIndex: 1000, display: 'flex', justifyContent: 'center', alignItems: 'center'}}>
-      <div style={{width: '90%', maxWidth: '600px', maxHeight: '90vh', overflowY: 'auto'}} className="card">
+  return createPortal(
+    <div style={{position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.8)', zIndex: 10000, display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '20px'}}>
+      <div style={{width: '90%', maxWidth: '600px', height: '80vh', overflowY: 'auto'}} className="card">
         <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px'}}>
           <h3 style={{margin: 0}}>{produto ? 'Editar Produto' : 'Novo Produto'}</h3>
           <button onClick={onClose} style={{background: 'none', border: 'none', fontSize: '1.5em', cursor: 'pointer'}}>×</button>
@@ -180,7 +181,8 @@ const ProdutoModal = ({ isOpen, onClose, produto, onSave }) => {
           </div>
         </form>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
 

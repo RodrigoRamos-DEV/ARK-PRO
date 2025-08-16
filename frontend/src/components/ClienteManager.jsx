@@ -150,7 +150,7 @@ const ClienteModal = ({ isOpen, onClose, cliente, onSave }) => {
   if (!isOpen) return null;
 
   return createPortal(
-    <div style={{position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.7)', zIndex: 1001, display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '20px'}}>
+    <div style={{position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.8)', zIndex: 10000, display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '20px'}}>
       <div style={{width: '90%', maxWidth: '700px', height: '80vh', overflowY: 'auto'}} className="card">
         <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px'}}>
           <h3 style={{margin: 0}}>{cliente ? 'Editar Cliente' : 'Novo Cliente'}</h3>

@@ -27,7 +27,6 @@ const ManagementModal = ({ isOpen, onClose, title, children }) => {
                 alignItems: 'center',
                 padding: '20px'
             }}
-            onClick={onClose}
         >
             <div 
                 style={{
@@ -41,7 +40,7 @@ const ManagementModal = ({ isOpen, onClose, title, children }) => {
                     transition: 'all 0.3s ease'
                 }} 
                 className="card"
-                onClick={(e) => e.stopPropagation()}
+
             >
                 <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', borderBottom: '1px solid var(--cor-borda)', paddingBottom: '15px'}}>
                     <h2 style={{margin: 0, color: 'var(--cor-primaria)'}}>{title}</h2>
