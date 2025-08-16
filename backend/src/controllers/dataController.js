@@ -355,10 +355,9 @@ exports.getNotaFiscalDetalhes = async (req, res) => {
 };
 
 const validateTransactionItems = async (clientId, type, description, category) => {
-    const descriptionType = 'produto'; // Sempre usar 'produto' para ambos os tipos
     const categoryType = type === 'venda' ? 'comprador' : 'fornecedor';
-    const descResult = await db.query('SELECT 1 FROM items WHERE client_id = $1 AND type = $2 AND name = $3', [clientId, descriptionType, description]);
-    if (descResult.rowCount === 0) { throw new Error(`O item '${description}' não está cadastrado como um(a) ${descriptionType}.`); }
+    const descResult = await db.query('SELECT 1 FROM items WHERE client_id = $1 AND type IN ($2, $3) AND name = $4', [clientId, 'produto', 'compra', description]);
+    if (descResult.rowCount === 0) { throw new Error(`O item '${description}' não está cadastrado como produto ou compra.`); }
     if (category && category.trim() !== '') {
         const catResult = await db.query('SELECT 1 FROM items WHERE client_id = $1 AND type = $2 AND name = $3', [clientId, categoryType, category]);
         if (catResult.rowCount === 0) { throw new Error(`O item '${category}' não está cadastrado como um(a) ${categoryType}.`); }
