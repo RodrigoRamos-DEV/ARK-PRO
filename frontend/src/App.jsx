@@ -24,6 +24,7 @@ import ErrorBoundary from './components/ErrorBoundary';
 import WhatsAppSupport from './components/WhatsAppSupport';
 import ClientTypeRouter from './components/ClientTypeRouter';
 import EmpresaDashboard from './components/EmpresaDashboard';
+import MigrationButton from './components/MigrationButton';
 
 function App() {
   const [theme, setTheme] = useState(localStorage.getItem('theme') || 'light');
@@ -40,6 +41,7 @@ function App() {
 
   return (
     <ErrorBoundary>
+      <MigrationButton />
       <Router>
         <ToastContainer
           position="top-right"
