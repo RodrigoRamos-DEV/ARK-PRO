@@ -11,14 +11,61 @@ import FuncionarioManager from './FuncionarioManager';
 // Componente Modal genérico
 const ManagementModal = ({ isOpen, onClose, title, children }) => {
     if (!isOpen) return null;
+    
     return (
-        <div style={{position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.7)', zIndex: 1000, display: 'flex', justifyContent: 'center', alignItems: 'center'}}>
-            <div style={{width: '95%', maxWidth: '1000px', maxHeight: '90vh', overflowY: 'auto', position: 'relative'}} className="card">
-                <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px'}}>
-                    <h2 style={{margin: 0}}>{title}</h2>
-                    <button onClick={onClose} style={{background: 'none', border: 'none', fontSize: '1.5em', cursor: 'pointer', color: 'var(--cor-texto)'}}>×</button>
+        <div 
+            style={{
+                position: 'fixed', 
+                top: 0, 
+                left: 0, 
+                right: 0, 
+                bottom: 0, 
+                backgroundColor: 'rgba(0,0,0,0.7)', 
+                zIndex: 9999, 
+                display: 'flex', 
+                justifyContent: 'center', 
+                alignItems: 'center',
+                padding: '20px'
+            }}
+            onClick={onClose}
+        >
+            <div 
+                style={{
+                    width: '95%', 
+                    maxWidth: '1200px', 
+                    minHeight: '400px',
+                    maxHeight: '90vh', 
+                    overflowY: 'auto', 
+                    position: 'relative',
+                    transform: 'scale(1)',
+                    transition: 'all 0.3s ease'
+                }} 
+                className="card"
+                onClick={(e) => e.stopPropagation()}
+            >
+                <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', borderBottom: '1px solid var(--cor-borda)', paddingBottom: '15px'}}>
+                    <h2 style={{margin: 0, color: 'var(--cor-primaria)'}}>{title}</h2>
+                    <button 
+                        onClick={onClose} 
+                        style={{
+                            background: 'none', 
+                            border: 'none', 
+                            fontSize: '1.8em', 
+                            cursor: 'pointer', 
+                            color: 'var(--cor-texto)',
+                            padding: '5px 10px',
+                            borderRadius: '50%',
+                            transition: 'background-color 0.2s'
+                        }}
+                        onMouseEnter={(e) => e.target.style.backgroundColor = 'var(--cor-hover)'}
+                        onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
+                    >
+                        ×
+                    </button>
                 </div>
-                {children}
+                <div style={{minHeight: '300px'}}>
+                    {children}
+                </div>
             </div>
         </div>
     );
@@ -48,7 +95,18 @@ function CadastroPage() {
   };
 
   const closeModal = () => {
+    // Forçar reset completo do modal
     setModalState({ isOpen: false, type: '', title: '' });
+    
+    // Garantir que o DOM seja limpo
+    setTimeout(() => {
+      const modals = document.querySelectorAll('[style*="position: fixed"]');
+      modals.forEach(modal => {
+        if (modal.style.zIndex === '9999') {
+          modal.style.transform = 'scale(1)';
+        }
+      });
+    }, 100);
   };
 
   const renderModalContent = () => {
