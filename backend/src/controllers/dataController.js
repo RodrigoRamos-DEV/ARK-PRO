@@ -145,7 +145,7 @@ exports.getProdutos = async (req, res) => {
             SELECT id, name, codigo, unidade, categoria, preco_venda, preco_custo, 
                    estoque_atual, estoque_minimo, observacoes, type
             FROM items 
-            WHERE client_id = $1 AND type IN ('produto', 'compra') AND (ativo = true OR ativo IS NULL) 
+            WHERE client_id = $1 AND type = 'produto' AND (ativo = true OR ativo IS NULL) 
             ORDER BY name
         `, [req.user.clientId]);
         res.json(result.rows);
@@ -356,8 +356,8 @@ exports.getNotaFiscalDetalhes = async (req, res) => {
 
 const validateTransactionItems = async (clientId, type, description, category) => {
     const categoryType = type === 'venda' ? 'comprador' : 'fornecedor';
-    const descResult = await db.query('SELECT 1 FROM items WHERE client_id = $1 AND type IN ($2, $3) AND name = $4', [clientId, 'produto', 'compra', description]);
-    if (descResult.rowCount === 0) { throw new Error(`O item '${description}' não está cadastrado como produto ou compra.`); }
+    const descResult = await db.query('SELECT 1 FROM items WHERE client_id = $1 AND type = $2 AND name = $3', [clientId, 'produto', description]);
+    if (descResult.rowCount === 0) { throw new Error(`O item '${description}' não está cadastrado como produto.`); }
     if (category && category.trim() !== '') {
         const catResult = await db.query('SELECT 1 FROM items WHERE client_id = $1 AND type = $2 AND name = $3', [clientId, categoryType, category]);
         if (catResult.rowCount === 0) { throw new Error(`O item '${category}' não está cadastrado como um(a) ${categoryType}.`); }
