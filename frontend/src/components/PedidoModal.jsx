@@ -168,40 +168,87 @@ const PedidoModal = ({ isOpen, onClose, onSave, tipo, funcionarios, produtos, cl
     }
 
     try {
-      // Gerar ID único para o pedido
-      const pedidoId = uuidv4();
-      const lancamentos = [];
-      
-      for (const item of itens) {
-        const lancamentoData = {
-          employee_id: formData.employee_id,
-          type: tipo === 'venda' ? 'venda' : 'gasto',
-          description: item.produto_nome,
-          category: formData.cliente_fornecedor,
-          quantity: item.quantidade,
-          unit_price: item.preco_unitario,
-          total_price: item.subtotal,
-          transaction_date: formData.data_pedido,
-          status: 'A Pagar',
-          pedido_id: pedidoId,
-          pedido_info: `${tipo === 'venda' ? 'Venda' : 'Compra'} - ${formData.cliente_fornecedor} - ${itens.length} itens`
-        };
+      if (editingPedido) {
+        // MODO EDIÇÃO - Atualizar pedido existente
+        const pedidoId = editingPedido.pedido_id || editingPedido.id;
         
-        console.log('Enviando dados:', lancamentoData);
-        
-        const response = await axios.post(`${API_URL}/api/data/transactions`, lancamentoData, {
+        // 1. Deletar lançamentos antigos do pedido
+        const existingTransactions = await axios.get(`${API_URL}/api/data/transactions`, {
           headers: { 'x-auth-token': token }
         });
         
-        lancamentos.push(response.data);
+        const transactionsToDelete = existingTransactions.data.filter(t => 
+          t.pedido_id === pedidoId || 
+          (t.pedido_info && t.pedido_info.includes(editingPedido.cliente_fornecedor))
+        );
+        
+        for (const transaction of transactionsToDelete) {
+          await axios.delete(`${API_URL}/api/data/transactions/${transaction.id}`, {
+            headers: { 'x-auth-token': token }
+          });
+        }
+        
+        // 2. Criar novos lançamentos
+        const lancamentos = [];
+        for (const item of itens) {
+          const lancamentoData = {
+            employee_id: formData.employee_id,
+            type: tipo === 'venda' ? 'venda' : 'gasto',
+            description: item.produto_nome,
+            category: formData.cliente_fornecedor,
+            quantity: item.quantidade,
+            unit_price: item.preco_unitario,
+            total_price: item.subtotal,
+            transaction_date: formData.data_pedido,
+            status: 'A Pagar',
+            pedido_id: pedidoId,
+            pedido_info: `${tipo === 'venda' ? 'Venda' : 'Compra'} - ${formData.cliente_fornecedor} - ${itens.length} itens`
+          };
+          
+          const response = await axios.post(`${API_URL}/api/data/transactions`, lancamentoData, {
+            headers: { 'x-auth-token': token }
+          });
+          
+          lancamentos.push(response.data);
+        }
+        
+        toast.success(`${tipo === 'venda' ? 'Pedido de venda' : 'Pedido de compra'} atualizado! ${itens.length} lançamentos.`);
+        onSave({ lancamentos, total: calcularTotal(), pedidoId, isEdit: true });
+      } else {
+        // MODO CRIAÇÃO - Criar novo pedido
+        const pedidoId = uuidv4();
+        const lancamentos = [];
+        
+        for (const item of itens) {
+          const lancamentoData = {
+            employee_id: formData.employee_id,
+            type: tipo === 'venda' ? 'venda' : 'gasto',
+            description: item.produto_nome,
+            category: formData.cliente_fornecedor,
+            quantity: item.quantidade,
+            unit_price: item.preco_unitario,
+            total_price: item.subtotal,
+            transaction_date: formData.data_pedido,
+            status: 'A Pagar',
+            pedido_id: pedidoId,
+            pedido_info: `${tipo === 'venda' ? 'Venda' : 'Compra'} - ${formData.cliente_fornecedor} - ${itens.length} itens`
+          };
+          
+          const response = await axios.post(`${API_URL}/api/data/transactions`, lancamentoData, {
+            headers: { 'x-auth-token': token }
+          });
+          
+          lancamentos.push(response.data);
+        }
+        
+        toast.success(`${tipo === 'venda' ? 'Pedido de venda' : 'Pedido de compra'} criado! ${itens.length} lançamentos agrupados.`);
+        onSave({ lancamentos, total: calcularTotal(), pedidoId });
       }
       
-      toast.success(`${tipo === 'venda' ? 'Pedido de venda' : 'Pedido de compra'} criado! ${itens.length} lançamentos agrupados.`);
-      onSave({ lancamentos, total: calcularTotal(), pedidoId });
       onClose();
     } catch (error) {
       console.error('Erro detalhado:', error.response?.data);
-      toast.error(error.response?.data?.error || 'Erro ao criar pedido');
+      toast.error(error.response?.data?.error || `Erro ao ${editingPedido ? 'atualizar' : 'criar'} pedido`);
     }
   };
 
