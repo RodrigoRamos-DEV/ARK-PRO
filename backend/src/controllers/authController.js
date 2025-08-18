@@ -6,6 +6,7 @@ const nodemailer = require('nodemailer');
 
 exports.login = async (req, res) => {
   const { email, password } = req.body;
+  console.log('Login attempt for:', email);
   try {
     const userResult = await db.query(
         'SELECT u.*, c.company_name, c.license_expires_at, c.license_status, COALESCE(c.client_type, \'produtor\') as client_type FROM users u LEFT JOIN clients c ON u.client_id = c.id WHERE u.email = $1',
@@ -13,6 +14,7 @@ exports.login = async (req, res) => {
     );
 
     if (userResult.rows.length === 0) {
+      console.log('User not found:', email);
       return res.status(400).json({ msg: 'Email ou senha inválidos.' });
     }
 
@@ -35,8 +37,11 @@ exports.login = async (req, res) => {
 
     const isMatch = await bcrypt.compare(password, user.password_hash);
     if (!isMatch) {
+      console.log('Password mismatch for:', email);
       return res.status(400).json({ msg: 'Email ou senha inválidos.' });
     }
+    
+    console.log('Login successful for:', email);
     
     const payload = {
         user: {
@@ -57,7 +62,11 @@ exports.login = async (req, res) => {
       process.env.JWT_SECRET,
       { expiresIn: '8h' },
       (err, token) => {
-        if (err) throw err;
+        if (err) {
+          console.error('JWT sign error:', err);
+          throw err;
+        }
+        console.log('Sending response with token');
         res.json({ token, user: payload.user });
       }
     );
