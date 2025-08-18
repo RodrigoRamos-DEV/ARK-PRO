@@ -1,24 +1,29 @@
-/* Estilos Globais e Variáveis de Tema */
+/* Paleta ARK - Baseada na Logo */
 :root {
-    --cor-primaria: #6d28d9;
-    --cor-destaque: #8b5cf6;
-    --cor-fundo: #f5f3f7;
+    /* Cores da Logo ARK */
+    --cor-primaria: #1e3a8a;        /* Azul escuro da logo */
+    --cor-destaque: #f97316;        /* Laranja vibrante da logo */
+    
+    /* Cores Neutras */
+    --cor-fundo: #f8fafc;
     --cor-card: #ffffff;
-    --cor-texto: #333;
-    --cor-texto-label: #555;
+    --cor-texto: #1f2937;
+    --cor-texto-label: #6b7280;
     --cor-borda: #e5e7eb;
-    --sombra-card: 0 4px 6px -1px rgba(0,0,0,0.1);
-    --cor-sucesso: #16a34a;
+    --sombra-card: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+    
+    /* Estados */
+    --cor-sucesso: #10b981;
     --cor-erro: #dc2626;
-    --cor-aviso: #f59e0b; /* A DEFINIÇÃO CRÍTICA ESTÁ AQUI */
+    --cor-aviso: #f59e0b;
 }
 
 body.dark-mode {
-    --cor-fundo: #0f172a;
-    --cor-card: #1e293b;
-    --cor-texto: #f1f5f9;
-    --cor-texto-label: #e2e8f0;
-    --cor-borda: #475569;
+    --cor-fundo: #111827;
+    --cor-card: #1f2937;
+    --cor-texto: #f9fafb;
+    --cor-texto-label: #d1d5db;
+    --cor-borda: #374151;
     --sombra-card: 0 4px 6px -1px rgba(0,0,0,0.6);
     --cor-sucesso: #22c55e;
     --cor-erro: #ef4444;
@@ -237,7 +242,7 @@ body {
 
 h1, h2 { color: var(--cor-primaria); }
 
-/* Outros componentes */
+/* Botões */
 .btn {
     background-color: var(--cor-primaria);
     color: white;
