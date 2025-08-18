@@ -48,7 +48,18 @@ app.use('/api/admin', adminNotificationRoutes);
 app.use('/api/migrate', migrateRoutes);
 app.use('/api/sync', syncRoutes);
 
+// Servir arquivos estáticos do frontend (DEPOIS das rotas da API)
+app.use(express.static(path.join(__dirname, 'dist')));
 
+// Rota catch-all para SPA (Single Page Application)
+app.get('*', (req, res) => {
+  // Se não for uma rota da API, serve o index.html
+  if (!req.path.startsWith('/api/')) {
+    res.sendFile(path.join(__dirname, 'dist', 'index.html'));
+  } else {
+    res.status(404).json({ error: 'API endpoint not found' });
+  }
+});
 
 app.get('/', (req, res) => {
   res.send('Servidor ARK Backend está no ar!');
