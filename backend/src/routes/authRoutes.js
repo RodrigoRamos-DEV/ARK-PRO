@@ -2,6 +2,12 @@ const express = require('express');
 const router = express.Router();
 const authController = require('../controllers/authController');
 
+// Rota de teste
+router.get('/test', (req, res) => {
+    console.log('Test endpoint called');
+    res.json({ message: 'API funcionando!', timestamp: new Date().toISOString() });
+});
+
 // Rota de Login (pública)
 router.post('/login', authController.login);
 
