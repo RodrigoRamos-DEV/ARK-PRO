@@ -56,8 +56,8 @@ exports.createVendedor = async (req, res) => {
         console.log(`[CREATE_VENDEDOR] Inserindo vendedor: ${name}, porcentagem: ${pct}`);
         
         const result = await db.query(
-            'INSERT INTO vendedores (name, porcentagem, profit_share, pix, endereco, telefone) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
-            [name, pct, 0, pix || '', endereco || '', telefone || '']
+            'INSERT INTO vendedores (name, porcentagem, pix, endereco, telefone) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+            [name, pct, pix || '', endereco || '', telefone || '']
         );
         
         console.log('[CREATE_VENDEDOR] Vendedor criado com sucesso:', result.rows[0]);
@@ -76,8 +76,8 @@ exports.updateVendedor = async (req, res) => {
     try {
         const pct = Math.min(Math.max(parseFloat(porcentagem) || 0, 0), 99.99);
         const result = await db.query(
-            'UPDATE vendedores SET name = $1, porcentagem = $2, profit_share = $3, pix = $4, endereco = $5, telefone = $6 WHERE id = $7 RETURNING *',
-            [name, pct, 0, pix || '', endereco || '', telefone || '', id]
+            'UPDATE vendedores SET name = $1, porcentagem = $2, pix = $3, endereco = $4, telefone = $5 WHERE id = $6 RETURNING *',
+            [name, pct, pix || '', endereco || '', telefone || '', id]
         );
         if (result.rowCount === 0) {
             return res.status(404).json({ error: 'Vendedor não encontrado.' });
