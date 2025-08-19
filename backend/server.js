@@ -22,7 +22,15 @@ const fixRoutes = require('./src/routes/fixRoutes');
 const app = express();
 
 // Middlewares Globais
-app.use(cors());
+app.use(cors({
+    origin: [
+        'http://localhost:5173',
+        'https://ark-pro-app.onrender.com'
+    ],
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization']
+}));
 app.use(express.json());
 
 // Log de todas as requisições
