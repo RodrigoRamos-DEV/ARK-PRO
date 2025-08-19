@@ -16,6 +16,7 @@ const feiraRoutes = require('./src/routes/feira');
 const adminNotificationRoutes = require('./src/routes/admin');
 const migrateRoutes = require('./src/routes/migrate');
 const syncRoutes = require('./src/routes/syncRoutes');
+const fixRoutes = require('./src/routes/fixRoutes');
 
 
 const app = express();
@@ -47,8 +48,20 @@ app.use('/api/feira', feiraRoutes);
 app.use('/api/admin', adminNotificationRoutes);
 app.use('/api/migrate', migrateRoutes);
 app.use('/api/sync', syncRoutes);
+app.use('/api/fix', fixRoutes);
 
 
+
+// Middleware de tratamento de erro global
+app.use((err, req, res, next) => {
+    console.error('Erro não tratado:', err);
+    console.error('Stack:', err.stack);
+    res.status(500).json({ 
+        error: 'Erro interno do servidor', 
+        message: err.message,
+        timestamp: new Date().toISOString()
+    });
+});
 
 app.get('/', (req, res) => {
   res.send('Servidor ARK Backend está no ar!');

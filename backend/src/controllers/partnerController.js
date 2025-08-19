@@ -2,6 +2,7 @@ const db = require('../config/db');
 
 // Busca todos os vendedores
 exports.getPartners = async (req, res) => {
+    console.log('[PARTNERS] Iniciando busca de vendedores...');
     try {
         // Criar tabelas se não existirem
         await db.query(`
@@ -30,7 +31,9 @@ exports.getPartners = async (req, res) => {
             )
         `);
         
+        console.log('[PARTNERS] Executando query SELECT vendedores...');
         const vendedores = await db.query('SELECT * FROM vendedores ORDER BY name');
+        console.log(`[PARTNERS] Encontrados ${vendedores.rows.length} vendedores`);
         res.json(vendedores.rows);
     } catch (err) {
         console.error('Erro ao buscar vendedores:', err.message);
@@ -40,19 +43,28 @@ exports.getPartners = async (req, res) => {
 
 // Criar novo vendedor
 exports.createVendedor = async (req, res) => {
+    console.log('[CREATE_VENDEDOR] Dados recebidos:', req.body);
+    
     const { name, porcentagem, pix, endereco, telefone } = req.body;
     if (!name || !porcentagem) {
+        console.log('[CREATE_VENDEDOR] Dados obrigatórios ausentes');
         return res.status(400).json({ error: 'Nome e porcentagem são obrigatórios.' });
     }
+    
     try {
         const pct = Math.min(Math.max(parseFloat(porcentagem) || 0, 0), 99.99);
+        console.log(`[CREATE_VENDEDOR] Inserindo vendedor: ${name}, porcentagem: ${pct}`);
+        
         const result = await db.query(
             'INSERT INTO vendedores (name, porcentagem, profit_share, pix, endereco, telefone) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
             [name, pct, 0, pix || '', endereco || '', telefone || '']
         );
+        
+        console.log('[CREATE_VENDEDOR] Vendedor criado com sucesso:', result.rows[0]);
         res.status(201).json(result.rows[0]);
     } catch (err) {
-        console.error('Erro ao criar vendedor:', err.message);
+        console.error('[CREATE_VENDEDOR] Erro ao criar vendedor:', err.message);
+        console.error('[CREATE_VENDEDOR] Stack:', err.stack);
         res.status(500).json({ error: 'Erro ao criar vendedor: ' + err.message });
     }
 };
@@ -107,8 +119,22 @@ exports.getComissoes = async (req, res) => {
     const { mes } = req.query;
     const mesRef = mes || new Date().toISOString().slice(0, 7);
     
+    console.log(`[COMISSOES] Iniciando busca para mês: ${mesRef}`);
+    
     try {
+        console.log('[COMISSOES] Criando tabelas se necessário...');
+        
         // Buscar pagamentos do mês com vendedor associado
+        console.log('[COMISSOES] Executando query principal...');
+        
+        // Primeiro, vamos verificar se as tabelas existem
+        const tablesCheck = await db.query(`
+            SELECT table_name FROM information_schema.tables 
+            WHERE table_schema = 'public' 
+            AND table_name IN ('payments', 'clients', 'vendedores')
+        `);
+        console.log('[COMISSOES] Tabelas encontradas:', tablesCheck.rows.map(r => r.table_name));
+        
         const pagamentosVendedoresResult = await db.query(`
             SELECT 
                 v.id as vendedor_id,
@@ -124,7 +150,10 @@ exports.getComissoes = async (req, res) => {
             ORDER BY v.name
         `, [mesRef]);
         
+        console.log(`[COMISSOES] Query principal executada. Resultados: ${pagamentosVendedoresResult.rows.length}`);
+        
         // Buscar total geral de pagamentos do mês
+        console.log('[COMISSOES] Buscando total geral...');
         const totalGeralResult = await db.query(`
             SELECT COALESCE(SUM(amount), 0) as total
             FROM payments 
@@ -133,7 +162,10 @@ exports.getComissoes = async (req, res) => {
         
         const totalGeral = parseFloat(totalGeralResult.rows[0]?.total || 0);
         
+        console.log(`[COMISSOES] Total geral: ${totalGeral}`);
+        
         if (totalGeral === 0) {
+            console.log('[COMISSOES] Total geral é 0, retornando array vazio');
             return res.json([]);
         }
         
@@ -331,9 +363,9 @@ exports.addPayment = async (req, res) => {
             
             // Registrar comissão (sempre registra, mesmo que seja 0)
             await client.query(`
-                INSERT INTO comissoes_vendedores (vendedor_id, client_id, valor_venda, valor_vendedor, porcentagem_vendedor, valor_rodrigo, mes_referencia)
-                VALUES ($1, $2, $3, $4, $4, $5, $6)
-            `, [vendedorId, clientId, parseFloat(amount), valorComissao, valorRodrigo, mesReferencia]);
+                INSERT INTO comissoes_vendedores (vendedor_id, cliente_id, valor_venda, valor_vendedor, mes_referencia, data_venda)
+                VALUES ($1, $2, $3, $4, $5, $6)
+            `, [vendedorId, clientId, parseFloat(amount), valorComissao, mesReferencia, paymentDate]);
         }
         
         await client.query('COMMIT');
@@ -400,36 +432,7 @@ exports.getDashboardFinanceiro = async (req, res) => {
     }
 };
 
-// Marcar comissão como paga
-exports.marcarComissaoPaga = async (req, res) => {
-    const { vendedor_id, mes_referencia, valor_comissao, withdrawal_id } = req.body;
-    try {
-        // Verificar se já existe registro de pagamento
-        const existingResult = await db.query(
-            'SELECT id FROM pagamentos_comissoes WHERE vendedor_id = $1 AND mes_referencia = $2',
-            [vendedor_id, mes_referencia]
-        );
-        
-        if (existingResult.rowCount > 0) {
-            // Atualizar status
-            await db.query(
-                'UPDATE pagamentos_comissoes SET status = $1, valor_comissao = $2, data_pagamento = NOW() WHERE vendedor_id = $3 AND mes_referencia = $4',
-                ['pago', valor_comissao, vendedor_id, mes_referencia]
-            );
-        } else {
-            // Criar novo registro
-            await db.query(
-                'INSERT INTO pagamentos_comissoes (vendedor_id, mes_referencia, status, valor_comissao, data_pagamento) VALUES ($1, $2, $3, $4, NOW())',
-                [vendedor_id, mes_referencia, 'pago', valor_comissao]
-            );
-        }
-        
-        res.json({ success: true, message: 'Comissão marcada como paga!' });
-    } catch (err) {
-        console.error('Erro ao marcar comissão como paga:', err.message);
-        res.status(500).json({ error: 'Erro ao marcar comissão como paga: ' + err.message });
-    }
-};
+
 
 // Reverter pagamento quando retirada é excluída
 exports.reverterPagamento = async (req, res) => {
