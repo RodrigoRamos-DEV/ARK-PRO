@@ -64,6 +64,17 @@ router.get('/fix-vendedores-schema', async (req, res) => {
             results.push('Coluna telefone já existe');
         }
         
+        // Adicionar coluna profit_share se não existir
+        if (!existingColumns.includes('profit_share')) {
+            await db.query(`
+                ALTER TABLE vendedores 
+                ADD COLUMN profit_share DECIMAL(12,2) DEFAULT 0
+            `);
+            results.push('Coluna profit_share adicionada');
+        } else {
+            results.push('Coluna profit_share já existe');
+        }
+        
         // Verificar estrutura final
         const finalColumns = await db.query(`
             SELECT column_name, data_type, is_nullable, column_default 
