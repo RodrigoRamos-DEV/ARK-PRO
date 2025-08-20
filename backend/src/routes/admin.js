@@ -68,12 +68,27 @@ router.delete('/notifications/:id', auth, async (req, res) => {
       return res.status(403).json({ message: 'Acesso negado' });
     }
 
+    const notificationId = req.params.id;
+    
+    // Validar se o ID é um UUID válido
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(notificationId)) {
+      return res.status(400).json({ message: 'ID de notificação inválido' });
+    }
+
     const { Pool } = require('pg');
     const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
+    // Primeiro, remover dispensas relacionadas
+    await pool.query(
+      'DELETE FROM dismissed_notifications WHERE notification_id = $1',
+      [notificationId]
+    );
+
+    // Depois, remover a notificação
     const result = await pool.query(
       'DELETE FROM admin_notifications WHERE id = $1 RETURNING id',
-      [req.params.id]
+      [notificationId]
     );
 
     if (result.rows.length === 0) {
@@ -83,7 +98,8 @@ router.delete('/notifications/:id', auth, async (req, res) => {
     res.json({ message: 'Notificação removida com sucesso' });
   } catch (error) {
     console.error('Erro ao deletar notificação:', error);
-    res.status(500).json({ message: 'Erro interno do servidor' });
+    console.error('ID recebido:', req.params.id);
+    res.status(500).json({ message: 'Erro interno do servidor', error: error.message });
   }
 });
 

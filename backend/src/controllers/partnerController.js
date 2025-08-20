@@ -6,6 +6,18 @@ exports.getPartners = async (req, res) => {
     try {
         // Criar tabelas se não existirem
         await db.query(`
+            CREATE TABLE IF NOT EXISTS payment_vendors (
+                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                payment_id UUID NOT NULL REFERENCES payments(id) ON DELETE CASCADE,
+                vendedor_id TEXT NOT NULL,
+                porcentagem DECIMAL(5,2) NOT NULL,
+                valor_comissao DECIMAL(12,2) NOT NULL,
+                status VARCHAR(20) DEFAULT 'pendente',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
+        
+        await db.query(`
             CREATE TABLE IF NOT EXISTS pagamentos_comissoes (
                 id SERIAL PRIMARY KEY,
                 vendedor_id INTEGER,
@@ -373,8 +385,8 @@ exports.addPayment = async (req, res) => {
         // Primeiro, garantir que a tabela existe
         await db.query(`
             CREATE TABLE IF NOT EXISTS payment_vendors (
-                id SERIAL PRIMARY KEY,
-                payment_id UUID NOT NULL,
+                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                payment_id UUID NOT NULL REFERENCES payments(id) ON DELETE CASCADE,
                 vendedor_id TEXT NOT NULL,
                 porcentagem DECIMAL(5,2) NOT NULL,
                 valor_comissao DECIMAL(12,2) NOT NULL,
