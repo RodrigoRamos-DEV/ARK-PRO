@@ -132,51 +132,58 @@ exports.getComissoes = async (req, res) => {
     const mesRef = mes || new Date().toISOString().slice(0, 7);
     
     try {
-        // Primeiro tentar com a nova tabela, se falhar usar versão simples
+        // Criar tabela payment_vendors se não existir
+        await db.query(`
+            CREATE TABLE IF NOT EXISTS payment_vendors (
+                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                payment_id UUID NOT NULL,
+                vendedor_id TEXT NOT NULL,
+                porcentagem DECIMAL(5,2) NOT NULL,
+                valor_comissao DECIMAL(12,2) NOT NULL,
+                status VARCHAR(20) DEFAULT 'pendente',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
+        
+        // Agora usar a tabela normalmente
+        const result = await db.query(`
+            SELECT 
+                v.id as vendedor_id,
+                v.name as vendedor_nome,
+                v.porcentagem,
+                v.pix,
+                (
+                    SELECT COALESCE(SUM(pv2.valor_comissao), 0)
+                    FROM payment_vendors pv2
+                    JOIN payments p2 ON pv2.payment_id = p2.id
+                    WHERE CAST(v.id AS TEXT) = pv2.vendedor_id
+                    AND TO_CHAR(p2.payment_date, 'YYYY-MM') = $1
+                ) as total_comissao,
+                (
+                    SELECT COUNT(*)
+                    FROM payment_vendors pv3
+                    JOIN payments p3 ON pv3.payment_id = p3.id
+                    WHERE CAST(v.id AS TEXT) = pv3.vendedor_id
+                    AND TO_CHAR(p3.payment_date, 'YYYY-MM') = $1
+                ) as total_pagamentos,
+                (
+                    SELECT CASE 
+                        WHEN COUNT(CASE WHEN pv4.status = 'pago' THEN 1 END) = COUNT(*) AND COUNT(*) > 0 THEN 'pago'
+                        ELSE 'pendente'
+                    END
+                    FROM payment_vendors pv4
+                    JOIN payments p4 ON pv4.payment_id = p4.id
+                    WHERE CAST(v.id AS TEXT) = pv4.vendedor_id
+                    AND TO_CHAR(p4.payment_date, 'YYYY-MM') = $1
+                ) as status_pagamento
+            FROM vendedores v
+            ORDER BY v.name
+        `, [mesRef]);
+        res.json(result.rows);
+    } catch (err) {
+        console.error('Erro ao buscar comissões:', err.message);
+        // Fallback para versão simples em caso de erro
         try {
-            const result = await db.query(`
-                SELECT 
-                    v.id as vendedor_id,
-                    v.name as vendedor_nome,
-                    v.porcentagem,
-                    v.pix,
-                    (
-                        SELECT COALESCE(SUM(pv2.valor_comissao), 0)
-                        FROM payment_vendors pv2
-                        JOIN payments p2 ON pv2.payment_id = p2.id
-                        WHERE CAST(v.id AS TEXT) = pv2.vendedor_id
-                        AND TO_CHAR(p2.payment_date, 'YYYY-MM') = $1
-                    ) as total_comissao,
-                    (
-                        SELECT COUNT(*)
-                        FROM payment_vendors pv3
-                        JOIN payments p3 ON pv3.payment_id = p3.id
-                        WHERE CAST(v.id AS TEXT) = pv3.vendedor_id
-                        AND TO_CHAR(p3.payment_date, 'YYYY-MM') = $1
-                    ) as total_pagamentos,
-                    (
-                        SELECT CASE 
-                            WHEN COUNT(CASE WHEN pv4.status = 'pago' THEN 1 END) = COUNT(*) AND COUNT(*) > 0 THEN 'pago'
-                            ELSE 'pendente'
-                        END
-                        FROM payment_vendors pv4
-                        JOIN payments p4 ON pv4.payment_id = p4.id
-                        WHERE CAST(v.id AS TEXT) = pv4.vendedor_id
-                        AND TO_CHAR(p4.payment_date, 'YYYY-MM') = $1
-                    ) as status_pagamento
-                FROM vendedores v
-                WHERE EXISTS (
-                    SELECT 1 FROM payment_vendors pv
-                    JOIN payments p ON pv.payment_id = p.id
-                    WHERE CAST(v.id AS TEXT) = pv.vendedor_id
-                    AND TO_CHAR(p.payment_date, 'YYYY-MM') = $1
-                )
-                ORDER BY v.name
-            `, [mesRef]);
-            res.json(result.rows);
-        } catch (tableError) {
-            console.log('Tabela payment_vendors não existe, usando versão simples');
-            // Versão simples sem as novas tabelas
             const result = await db.query(`
                 SELECT 
                     v.id as vendedor_id,
@@ -190,10 +197,9 @@ exports.getComissoes = async (req, res) => {
                 ORDER BY v.name
             `);
             res.json(result.rows);
+        } catch (fallbackErr) {
+            res.status(500).json({ error: 'Erro ao buscar comissões: ' + fallbackErr.message });
         }
-    } catch (err) {
-        console.error('Erro ao buscar comissões:', err.message);
-        res.status(500).json({ error: 'Erro ao buscar comissões: ' + err.message });
     }
 };
 
@@ -204,6 +210,19 @@ exports.marcarComissaoPaga = async (req, res) => {
     const client = await db.getClient();
     try {
         await client.query('BEGIN');
+        
+        // Criar tabela se não existir
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS payment_vendors (
+                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                payment_id UUID NOT NULL,
+                vendedor_id TEXT NOT NULL,
+                porcentagem DECIMAL(5,2) NOT NULL,
+                valor_comissao DECIMAL(12,2) NOT NULL,
+                status VARCHAR(20) DEFAULT 'pendente',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
         
         // Buscar comissões pendentes do vendedor no mês
         const comissoes = await client.query(`
@@ -592,20 +611,28 @@ exports.testeEstrutura = async (req, res) => {
 exports.getPaymentVendors = async (req, res) => {
     const { paymentId } = req.params;
     try {
-        try {
-            const result = await db.query(`
-                SELECT vendedor_id, porcentagem
-                FROM payment_vendors
-                WHERE payment_id = $1
-            `, [paymentId]);
-            res.json(result.rows);
-        } catch (tableError) {
-            console.log('Tabela payment_vendors não existe');
-            res.json([]);
-        }
+        // Criar tabela se não existir
+        await db.query(`
+            CREATE TABLE IF NOT EXISTS payment_vendors (
+                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                payment_id UUID NOT NULL,
+                vendedor_id TEXT NOT NULL,
+                porcentagem DECIMAL(5,2) NOT NULL,
+                valor_comissao DECIMAL(12,2) NOT NULL,
+                status VARCHAR(20) DEFAULT 'pendente',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
+        
+        const result = await db.query(`
+            SELECT vendedor_id, porcentagem
+            FROM payment_vendors
+            WHERE payment_id = $1
+        `, [paymentId]);
+        res.json(result.rows);
     } catch (err) {
         console.error(err.message);
-        res.status(500).json({ error: 'Erro ao buscar vendedores do pagamento.' });
+        res.json([]);
     }
 };
 
