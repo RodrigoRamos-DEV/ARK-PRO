@@ -61,7 +61,7 @@ function LoginPage() {
                     </div>
                     <button type="submit" className="btn" disabled={isLoading}>{isLoading ? 'A entrar...' : 'Entrar'}</button>
                 </form>
-                <p style={{ marginTop: '20px' }}>Não tem uma conta? <Link to="/register">Registe-se com um token</Link></p>
+                <p style={{ marginTop: '20px' }}>Não tem uma conta? <Link to="/register">Criar Conta</Link></p>
             </div>
         </div>
     );

@@ -24,6 +24,7 @@ import ErrorBoundary from './components/ErrorBoundary';
 import WhatsAppSupport from './components/WhatsAppSupport';
 import ClientTypeRouter from './components/ClientTypeRouter';
 import EmpresaDashboard from './components/EmpresaDashboard';
+import TestPaymentModal from './components/TestPaymentModal';
 
 function App() {
   const [theme, setTheme] = useState(localStorage.getItem('theme') || 'light');
@@ -80,6 +81,7 @@ function App() {
             </Route>
           </Route>
 
+          <Route path="/teste-pagamento" element={<TestPaymentModal />} />
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>
       </Router>

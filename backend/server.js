@@ -17,6 +17,11 @@ const adminNotificationRoutes = require('./src/routes/admin');
 const migrateRoutes = require('./src/routes/migrate');
 const syncRoutes = require('./src/routes/syncRoutes');
 const fixRoutes = require('./src/routes/fixRoutes');
+const onlineStatusRoutes = require('./src/routes/onlineStatusRoutes');
+
+// Importa middlewares
+const { checkTrialStatus } = require('./src/middleware/trialMiddleware');
+const auth = require('./src/middleware/authMiddleware');
 
 
 const app = express();
@@ -25,7 +30,8 @@ const app = express();
 app.use(cors({
     origin: [
         'http://localhost:5173',
-        'https://ark-pro-app.onrender.com'
+        'https://ark-pro-app.onrender.com',
+        'https://ark-pro-backend.onrender.com'
     ],
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
@@ -46,17 +52,18 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 // --- Definição das Rotas da API ---
 app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);
-app.use('/api/data', dataRoutes);
-app.use('/api/partners', partnerRoutes);
-app.use('/api/license', licenseRoutes);
-app.use('/api/backup', backupRoutes);
-app.use('/api/audit', auditRoutes);
-app.use('/api', importExportRoutes);
-app.use('/api/feira', feiraRoutes);
+app.use('/api/data', auth, checkTrialStatus, dataRoutes);
+app.use('/api/partners', auth, checkTrialStatus, partnerRoutes);
+app.use('/api/license', auth, checkTrialStatus, licenseRoutes);
+app.use('/api/backup', auth, checkTrialStatus, backupRoutes);
+app.use('/api/audit', auth, checkTrialStatus, auditRoutes);
+app.use('/api', auth, checkTrialStatus, importExportRoutes);
+app.use('/api/feira', auth, checkTrialStatus, feiraRoutes);
 app.use('/api/admin', adminNotificationRoutes);
 app.use('/api/migrate', migrateRoutes);
 app.use('/api/sync', syncRoutes);
 app.use('/api/fix', fixRoutes);
+app.use('/api/online', onlineStatusRoutes);
 
 
 

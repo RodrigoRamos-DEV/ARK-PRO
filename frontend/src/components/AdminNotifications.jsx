@@ -20,40 +20,60 @@ const AdminNotifications = () => {
     fetchNotifications();
   }, []);
 
-  const fetchNotifications = () => {
-    const stored = JSON.parse(localStorage.getItem('adminNotifications') || '[]');
-    setNotifications(stored);
+  const fetchNotifications = async () => {
+    try {
+      const response = await axios.get(`${API_URL}/api/admin/notifications`, {
+        headers: { 'x-auth-token': token }
+      });
+      setNotifications(response.data);
+    } catch (error) {
+      console.error('Erro ao buscar notificações:', error);
+      // Fallback para localStorage
+      const stored = JSON.parse(localStorage.getItem('adminNotifications') || '[]');
+      setNotifications(stored);
+    }
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!newNotification.title || !newNotification.message) {
       toast.error('Título e mensagem são obrigatórios');
       return;
     }
 
-    const notification = {
-      id: Date.now(),
-      ...newNotification,
-      target_audience: newNotification.targetAudience,
-      created_at: new Date().toISOString()
-    };
-
-    const stored = JSON.parse(localStorage.getItem('adminNotifications') || '[]');
-    stored.push(notification);
-    localStorage.setItem('adminNotifications', JSON.stringify(stored));
-    
-    toast.success('Aviso enviado com sucesso!');
-    setNewNotification({ title: '', message: '', type: 'info', targetAudience: 'all' });
-    fetchNotifications();
+    setLoading(true);
+    try {
+      await axios.post(`${API_URL}/api/admin/notifications`, {
+        title: newNotification.title,
+        message: newNotification.message,
+        type: newNotification.type,
+        target_audience: newNotification.targetAudience
+      }, {
+        headers: { 'x-auth-token': token }
+      });
+      
+      toast.success('Aviso enviado com sucesso!');
+      setNewNotification({ title: '', message: '', type: 'info', targetAudience: 'all' });
+      fetchNotifications();
+    } catch (error) {
+      console.error('Erro ao enviar aviso:', error);
+      toast.error('Erro ao enviar aviso. Tente novamente.');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const deleteNotification = (id) => {
-    const stored = JSON.parse(localStorage.getItem('adminNotifications') || '[]');
-    const filtered = stored.filter(n => n.id !== id);
-    localStorage.setItem('adminNotifications', JSON.stringify(filtered));
-    toast.success('Aviso removido');
-    fetchNotifications();
+  const deleteNotification = async (id) => {
+    try {
+      await axios.delete(`${API_URL}/api/admin/notifications/${id}`, {
+        headers: { 'x-auth-token': token }
+      });
+      toast.success('Aviso removido');
+      fetchNotifications();
+    } catch (error) {
+      console.error('Erro ao remover aviso:', error);
+      toast.error('Erro ao remover aviso.');
+    }
   };
 
   const getTypeIcon = (type) => {

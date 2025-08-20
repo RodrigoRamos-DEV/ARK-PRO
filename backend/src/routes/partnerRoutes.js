@@ -15,13 +15,14 @@ router.get('/comissoes', partnerController.getComissoes);
 router.post('/pagamentos/marcar-pago', partnerController.marcarComissaoPaga);
 router.post('/pagamentos/marcar-pendente', partnerController.marcarComissaoPendente);
 router.get('/pagamentos/status', partnerController.getStatusPagamentos);
-router.post('/pagamentos/reverter-pagamento', partnerController.reverterPagamento);
+router.post('/reverter-retirada', partnerController.reverterRetirada);
 router.get('/dashboard-financeiro', partnerController.getDashboardFinanceiro);
 router.delete('/limpar-dados', partnerController.limparDados);
 router.get('/teste-estrutura', partnerController.testeEstrutura);
 
 // Rotas para Pagamentos
 router.get('/payments', partnerController.getPayments);
+router.get('/payment-vendors/:paymentId', partnerController.getPaymentVendors);
 router.post('/payments', partnerController.addPayment);
 router.put('/payments/:id', partnerController.updatePayment);
 router.delete('/payments/:id', partnerController.deletePayment);

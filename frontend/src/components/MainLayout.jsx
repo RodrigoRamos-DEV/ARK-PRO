@@ -1,11 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
+import axios from 'axios';
 import GlobalSearch from './GlobalSearch';
 import WelcomeTips from './WelcomeTips';
 import Toast from './Toast';
 import ConfirmDialog from './ConfirmDialog';
 import { Icons } from './Icons';
 import Breadcrumbs from './Breadcrumbs';
+import TrialStatus from './TrialStatus';
+import ClientNotifications from './ClientNotifications';
+import useOnlineStatus from '../hooks/useOnlineStatus';
+import API_URL from '../apiConfig';
 
 
 const ExpiryWarning = ({ daysLeft }) => (
@@ -29,6 +34,9 @@ function MainLayout({ theme, toggleTheme, isAdmin = false }) {
     const navigate = useNavigate();
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const [licenseStatus, setLicenseStatus] = useState({ status: 'active', daysLeft: null });
+    
+    // Hook para gerenciar status online
+    useOnlineStatus();
 
     useEffect(() => {
         if (isAdmin) {
@@ -57,7 +65,20 @@ function MainLayout({ theme, toggleTheme, isAdmin = false }) {
         }
     }, [isAdmin]);
 
-    const handleLogout = () => {
+    const handleLogout = async () => {
+        const token = localStorage.getItem('token');
+        
+        // Notificar servidor sobre logout
+        if (token) {
+            try {
+                await axios.post(`${API_URL}/api/online/logout`, {}, {
+                    headers: { 'x-auth-token': token }
+                });
+            } catch (error) {
+                console.error('Erro ao fazer logout:', error);
+            }
+        }
+        
         localStorage.removeItem('token');
         localStorage.removeItem('user');
         navigate('/');
@@ -139,6 +160,8 @@ function MainLayout({ theme, toggleTheme, isAdmin = false }) {
             ) : (
                 <main className="container">
                     {!isAdmin && <Breadcrumbs />}
+                    {!isAdmin && <ClientNotifications />}
+                    {!isAdmin && <TrialStatus user={JSON.parse(localStorage.getItem('user') || '{}')} />}
                     <Outlet />
                     {licenseStatus.status === 'warning' && (
                         <ExpiryWarning daysLeft={licenseStatus.daysLeft} />

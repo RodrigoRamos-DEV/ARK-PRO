@@ -8,6 +8,7 @@ import AdminNotifications from './AdminNotifications';
 import { Doughnut } from 'react-chartjs-2';
 import { Chart as ChartJS, ArcElement, Tooltip, Legend } from 'chart.js';
 import API_URL from '../apiConfig';
+import OnlineStatusLED from './OnlineStatusLED';
 
 ChartJS.register(ArcElement, Tooltip, Legend);
 
@@ -36,6 +37,7 @@ function AdminPage() {
     const [newToken, setNewToken] = useState('');
     const [dashboardData, setDashboardData] = useState(null);
     const [activeTab, setActiveTab] = useState('produtores');
+    const [onlineStatus, setOnlineStatus] = useState([]);
 
     const ADMIN_API_URL = `${API_URL}/api/admin`;
     const token = localStorage.getItem('token');
@@ -43,17 +45,28 @@ function AdminPage() {
     const fetchData = async () => {
         setLoading(true);
         try {
-            const [clientsResponse, dashboardResponse] = await Promise.all([
+            const [clientsResponse, dashboardResponse, onlineResponse] = await Promise.all([
                 axios.get(`${ADMIN_API_URL}/clients`, { headers: { 'x-auth-token': token } }),
-                axios.get(`${ADMIN_API_URL}/dashboard`, { headers: { 'x-auth-token': token } })
+                axios.get(`${ADMIN_API_URL}/dashboard`, { headers: { 'x-auth-token': token } }),
+                axios.get(`${API_URL}/api/online/status`, { headers: { 'x-auth-token': token } })
             ]);
             setClients(clientsResponse.data);
             setDashboardData(dashboardResponse.data);
+            setOnlineStatus(onlineResponse.data);
         } catch (error) { toast.error("Erro ao carregar dados do painel."); } 
         finally { setLoading(false); }
     };
 
-    useEffect(() => { fetchData(); }, []);
+    useEffect(() => { 
+        fetchData(); 
+        // Atualizar status online a cada 30 segundos
+        const interval = setInterval(() => {
+            axios.get(`${API_URL}/api/online/status`, { headers: { 'x-auth-token': token } })
+                .then(response => setOnlineStatus(response.data))
+                .catch(() => {});
+        }, 30000);
+        return () => clearInterval(interval);
+    }, []);
 
     const handleSaveClient = async (formData, clientId) => {
         try {
@@ -285,6 +298,7 @@ function AdminPage() {
                                             <th style={{ padding: '10px', textAlign: 'left' }}>Contato</th>
                                             <th style={{ padding: '10px', textAlign: 'left' }}>Vencimento</th>
                                             <th style={{ padding: '10px', textAlign: 'left' }}>Status</th>
+                                            <th style={{ padding: '10px', textAlign: 'center' }}>Online</th>
                                             <th style={{ padding: '10px', textAlign: 'center' }}>Ações</th>
                                         </tr>
                                     </thead>
@@ -293,7 +307,11 @@ function AdminPage() {
                                             if (activeTab === 'empresas') return client.client_type === 'empresa';
                                             if (activeTab === 'produtores') return client.client_type === 'produtor';
                                             return true;
-                                        }).map(client => (
+                                        }).map(client => {
+                                            const clientOnlineStatus = onlineStatus.find(status => status.id === client.id);
+                                            const isOnline = clientOnlineStatus?.is_online || false;
+                                            
+                                            return (
                                             <tr key={client.id} style={{ borderBottom: '1px solid var(--cor-borda)' }}>
                                                 <td style={{ padding: '10px' }}>
                                                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -323,6 +341,14 @@ function AdminPage() {
                                                     </span>
                                                 </td>
                                                 <td style={{ padding: '10px', textAlign: 'center' }}>
+                                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px' }}>
+                                                        <OnlineStatusLED isOnline={isOnline} size={14} />
+                                                        <span style={{ fontSize: '0.8em', color: '#666' }}>
+                                                            {isOnline ? 'Online' : 'Offline'}
+                                                        </span>
+                                                    </div>
+                                                </td>
+                                                <td style={{ padding: '10px', textAlign: 'center' }}>
                                                     {!client.email && (
                                                         <button 
                                                             onClick={async () => {
@@ -346,7 +372,8 @@ function AdminPage() {
                                                     <button onClick={() => handleDeleteClient(client)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.2em' }} title="Excluir">🗑️</button>
                                                 </td>
                                             </tr>
-                                        ))}
+                                            );
+                                        })}
                                     </tbody>
                                 </table>
                             </div>

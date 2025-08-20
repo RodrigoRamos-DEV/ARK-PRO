@@ -114,134 +114,155 @@ exports.deleteVendedor = async (req, res) => {
     }
 };
 
-// Buscar comissões dos vendedores
+// Buscar comissões dos vendedores (versão que funciona sem tabelas novas)
 exports.getComissoes = async (req, res) => {
     const { mes } = req.query;
     const mesRef = mes || new Date().toISOString().slice(0, 7);
     
-    console.log(`[COMISSOES] Iniciando busca para mês: ${mesRef}`);
-    
     try {
-        console.log('[COMISSOES] Criando tabelas se necessário...');
-        
-        // Buscar pagamentos do mês com vendedor associado
-        console.log('[COMISSOES] Executando query principal...');
-        
-        // Primeiro, vamos verificar se as tabelas existem
-        const tablesCheck = await db.query(`
-            SELECT table_name FROM information_schema.tables 
-            WHERE table_schema = 'public' 
-            AND table_name IN ('payments', 'clients', 'vendedores')
-        `);
-        console.log('[COMISSOES] Tabelas encontradas:', tablesCheck.rows.map(r => r.table_name));
-        
-        const pagamentosVendedoresResult = await db.query(`
-            SELECT 
-                v.id as vendedor_id,
-                v.name as vendedor_nome,
-                v.porcentagem,
-                v.pix,
-                COALESCE(SUM(p.amount), 0) as total_vendas
-            FROM payments p
-            JOIN clients c ON p.client_id = c.id
-            JOIN vendedores v ON c.vendedor_id = v.id
-            WHERE TO_CHAR(p.payment_date, 'YYYY-MM') = $1
-            GROUP BY v.id, v.name, v.porcentagem, v.pix
-            ORDER BY v.name
-        `, [mesRef]);
-        
-        console.log(`[COMISSOES] Query principal executada. Resultados: ${pagamentosVendedoresResult.rows.length}`);
-        
-        // Buscar total geral de pagamentos do mês
-        console.log('[COMISSOES] Buscando total geral...');
-        const totalGeralResult = await db.query(`
-            SELECT COALESCE(SUM(amount), 0) as total
-            FROM payments 
-            WHERE TO_CHAR(payment_date, 'YYYY-MM') = $1
-        `, [mesRef]);
-        
-        const totalGeral = parseFloat(totalGeralResult.rows[0]?.total || 0);
-        
-        console.log(`[COMISSOES] Total geral: ${totalGeral}`);
-        
-        if (totalGeral === 0) {
-            console.log('[COMISSOES] Total geral é 0, retornando array vazio');
-            return res.json([]);
+        // Primeiro tentar com a nova tabela, se falhar usar versão simples
+        try {
+            const result = await db.query(`
+                SELECT 
+                    v.id as vendedor_id,
+                    v.name as vendedor_nome,
+                    v.porcentagem,
+                    v.pix,
+                    (
+                        SELECT COALESCE(SUM(pv2.valor_comissao), 0)
+                        FROM payment_vendors pv2
+                        JOIN payments p2 ON pv2.payment_id = p2.id
+                        WHERE CAST(v.id AS TEXT) = pv2.vendedor_id
+                        AND TO_CHAR(p2.payment_date, 'YYYY-MM') = $1
+                    ) as total_comissao,
+                    (
+                        SELECT COUNT(*)
+                        FROM payment_vendors pv3
+                        JOIN payments p3 ON pv3.payment_id = p3.id
+                        WHERE CAST(v.id AS TEXT) = pv3.vendedor_id
+                        AND TO_CHAR(p3.payment_date, 'YYYY-MM') = $1
+                    ) as total_pagamentos,
+                    (
+                        SELECT CASE 
+                            WHEN COUNT(CASE WHEN pv4.status = 'pago' THEN 1 END) = COUNT(*) AND COUNT(*) > 0 THEN 'pago'
+                            ELSE 'pendente'
+                        END
+                        FROM payment_vendors pv4
+                        JOIN payments p4 ON pv4.payment_id = p4.id
+                        WHERE CAST(v.id AS TEXT) = pv4.vendedor_id
+                        AND TO_CHAR(p4.payment_date, 'YYYY-MM') = $1
+                    ) as status_pagamento
+                FROM vendedores v
+                WHERE EXISTS (
+                    SELECT 1 FROM payment_vendors pv
+                    JOIN payments p ON pv.payment_id = p.id
+                    WHERE CAST(v.id AS TEXT) = pv.vendedor_id
+                    AND TO_CHAR(p.payment_date, 'YYYY-MM') = $1
+                )
+                ORDER BY v.name
+            `, [mesRef]);
+            res.json(result.rows);
+        } catch (tableError) {
+            console.log('Tabela payment_vendors não existe, usando versão simples');
+            // Versão simples sem as novas tabelas
+            const result = await db.query(`
+                SELECT 
+                    v.id as vendedor_id,
+                    v.name as vendedor_nome,
+                    v.porcentagem,
+                    v.pix,
+                    0 as total_comissao,
+                    0 as total_pagamentos,
+                    'pendente' as status_pagamento
+                FROM vendedores v
+                ORDER BY v.name
+            `);
+            res.json(result.rows);
         }
-        
-        const resultados = [];
-        let totalComissoesPagas = 0;
-        
-        // Processar vendedores que fizeram vendas
-        for (const vendedor of pagamentosVendedoresResult.rows) {
-            const porcentagem = parseFloat(vendedor.porcentagem || 0);
-            const totalVendas = parseFloat(vendedor.total_vendas || 0);
-            
-            if (totalVendas > 0 && porcentagem > 0) {
-                const comissaoVendedor = (totalVendas * porcentagem) / 100;
-                totalComissoesPagas += comissaoVendedor;
-                
-                // Verificar status de pagamento
-                const statusResult = await db.query(
-                    'SELECT status FROM pagamentos_comissoes WHERE vendedor_id = $1 AND mes_referencia = $2',
-                    [vendedor.vendedor_id, mesRef]
-                );
-                
-                const status = statusResult.rows[0]?.status || 'pendente';
-                
-                resultados.push({
-                    vendedor_nome: vendedor.vendedor_nome,
-                    porcentagem: vendedor.porcentagem,
-                    pix: vendedor.pix,
-                    total_vendas: totalVendas,
-                    total_comissao: comissaoVendedor,
-                    vendedor_id: vendedor.vendedor_id,
-                    status_pagamento: status
-                });
-            }
-        }
-        
-        // Resetar todos os status para pendente (debug)
-        await db.query('UPDATE pagamentos_comissoes SET status = $1', ['pendente']);
-        
-        res.json(resultados);
     } catch (err) {
         console.error('Erro ao buscar comissões:', err.message);
         res.status(500).json({ error: 'Erro ao buscar comissões: ' + err.message });
     }
 };
 
-// Marcar comissão como paga
+// Marcar comissão como paga e criar retirada automaticamente
 exports.marcarComissaoPaga = async (req, res) => {
-    const { vendedor_id, mes_referencia, valor_comissao } = req.body;
+    const { vendedor_id, mes_referencia } = req.body;
     
+    const client = await db.getClient();
     try {
-        // Criar tabela se não existir
-        await db.query(`
-            CREATE TABLE IF NOT EXISTS pagamentos_comissoes (
-                id SERIAL PRIMARY KEY,
-                vendedor_id INTEGER,
-                mes_referencia VARCHAR(7),
-                valor_comissao DECIMAL(12,2),
-                data_pagamento DATE,
-                status VARCHAR(20) DEFAULT 'pendente',
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                UNIQUE(vendedor_id, mes_referencia)
-            )
-        `);
+        await client.query('BEGIN');
         
-        const result = await db.query(`
-            INSERT INTO pagamentos_comissoes (vendedor_id, mes_referencia, valor_comissao, data_pagamento, status)
-            VALUES ($1, $2, $3, CURRENT_DATE, 'pago')
-            ON CONFLICT (vendedor_id, mes_referencia) 
-            DO UPDATE SET status = 'pago', data_pagamento = CURRENT_DATE, valor_comissao = $3
+        // Buscar comissões pendentes do vendedor no mês
+        const comissoes = await client.query(`
+            SELECT pv.*, v.name as vendedor_nome
+            FROM payment_vendors pv
+            JOIN payments p ON pv.payment_id = p.id
+            JOIN vendedores v ON CAST(v.id AS TEXT) = pv.vendedor_id
+            WHERE pv.vendedor_id = $1 
+            AND TO_CHAR(p.payment_date, 'YYYY-MM') = $2
+            AND pv.status = 'pendente'
+        `, [vendedor_id, mes_referencia]);
+        
+        if (comissoes.rows.length === 0) {
+            await client.query('ROLLBACK');
+            return res.status(400).json({ error: 'Nenhuma comissão pendente encontrada.' });
+        }
+        
+        // Calcular total das comissões
+        const totalComissao = comissoes.rows.reduce((sum, c) => sum + parseFloat(c.valor_comissao), 0);
+        const vendedorNome = comissoes.rows[0].vendedor_nome;
+        
+        console.log(`Criando UMA retirada para ${vendedorNome}: ${totalComissao} (${comissoes.rows.length} comissões)`);
+        
+        // Verificar se já existe retirada para este vendedor hoje
+        const existingWithdrawal = await client.query(`
+            SELECT id FROM withdrawals 
+            WHERE partner_id = $1 
+            AND withdrawal_date = CURRENT_DATE 
+            AND amount = $2
+        `, [vendedor_id, totalComissao]);
+        
+        if (existingWithdrawal.rows.length > 0) {
+            await client.query('ROLLBACK');
+            return res.status(400).json({ error: 'Retirada já existe para este vendedor hoje.' });
+        }
+        
+        // Criar UMA Única retirada com o valor total
+        const withdrawal = await client.query(`
+            INSERT INTO withdrawals (partner_id, amount, withdrawal_date)
+            VALUES ($1, $2, CURRENT_DATE)
             RETURNING *
-        `, [vendedor_id, mes_referencia, parseFloat(valor_comissao) || 0]);
+        `, [vendedor_id, totalComissao]);
         
-        res.json({ success: true, data: result.rows[0] });
+        // Marcar TODAS as comissões como pagas
+        const updateResult = await client.query(`
+            UPDATE payment_vendors 
+            SET status = 'pago'
+            WHERE vendedor_id = $1 
+            AND payment_id IN (
+                SELECT p.id FROM payments p 
+                WHERE TO_CHAR(p.payment_date, 'YYYY-MM') = $2
+            )
+            AND status = 'pendente'
+        `, [vendedor_id, mes_referencia]);
+        
+        console.log(`Marcadas ${updateResult.rowCount} comissões como pagas`);
+        
+        await client.query('COMMIT');
+        
+        res.json({ 
+            success: true, 
+            withdrawal: withdrawal.rows[0],
+            total_comissao: totalComissao,
+            comissoes_pagas: comissoes.rows.length
+        });
     } catch (err) {
-        console.error(err.message);
-        res.status(500).json({ error: 'Erro ao marcar pagamento.' });
+        await client.query('ROLLBACK');
+        console.error('Erro ao marcar pagamento:', err.message);
+        res.status(500).json({ error: 'Erro ao marcar pagamento: ' + err.message });
+    } finally {
+        client.release();
     }
 };
 
@@ -250,17 +271,29 @@ exports.marcarComissaoPendente = async (req, res) => {
     const { vendedor_id, mes_referencia } = req.body;
     
     try {
-        const result = await db.query(`
-            UPDATE pagamentos_comissoes 
-            SET status = 'pendente', data_pagamento = NULL
-            WHERE vendedor_id = $1 AND mes_referencia = $2
-            RETURNING *
+        // Marcar comissões como pendentes
+        await db.query(`
+            UPDATE payment_vendors 
+            SET status = 'pendente'
+            WHERE vendedor_id = $1 
+            AND payment_id IN (
+                SELECT p.id FROM payments p 
+                WHERE TO_CHAR(p.payment_date, 'YYYY-MM') = $2
+            )
         `, [vendedor_id, mes_referencia]);
         
-        res.json({ success: true, data: result.rows[0] });
+        // Excluir retirada relacionada (se existir)
+        await db.query(`
+            DELETE FROM withdrawals 
+            WHERE partner_id = $1 
+            AND withdrawal_date >= $2::date 
+            AND withdrawal_date < ($2::date + INTERVAL '1 month')
+        `, [vendedor_id, mes_referencia + '-01']);
+        
+        res.json({ success: true });
     } catch (err) {
-        console.error(err.message);
-        res.status(500).json({ error: 'Erro ao alterar status.' });
+        console.error('Erro ao marcar como pendente:', err.message);
+        res.status(500).json({ error: 'Erro ao alterar status: ' + err.message });
     }
 };
 
@@ -329,53 +362,56 @@ exports.getPayments = async (req, res) => {
     }
 };
 
-// Adiciona um novo pagamento de cliente
+// Adiciona um novo pagamento de cliente com comissões
 exports.addPayment = async (req, res) => {
-    const { clientId, amount, paymentDate, notes } = req.body;
+    const { clientId, amount, paymentDate, notes, vendedores } = req.body;
     if (!clientId || !amount || !paymentDate) {
         return res.status(400).json({ error: 'Cliente, valor e data são obrigatórios.' });
     }
     
-    const client = await db.getClient();
     try {
-        await client.query('BEGIN');
+        // Primeiro, garantir que a tabela existe
+        await db.query(`
+            CREATE TABLE IF NOT EXISTS payment_vendors (
+                id SERIAL PRIMARY KEY,
+                payment_id UUID NOT NULL,
+                vendedor_id TEXT NOT NULL,
+                porcentagem DECIMAL(5,2) NOT NULL,
+                valor_comissao DECIMAL(12,2) NOT NULL,
+                status VARCHAR(20) DEFAULT 'pendente',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
         
         // Adicionar pagamento
-        const newPayment = await client.query(
+        const newPayment = await db.query(
             'INSERT INTO payments (client_id, amount, payment_date, notes) VALUES ($1, $2, $3, $4) RETURNING *',
             [clientId, amount, paymentDate, notes]
         );
         
-        // Buscar vendedor do cliente
-        const clientResult = await client.query('SELECT vendedor_id FROM clients WHERE id = $1', [clientId]);
-        const vendedorId = clientResult.rows[0]?.vendedor_id;
+        const paymentId = newPayment.rows[0].id;
+        console.log('Pagamento criado:', paymentId);
+        console.log('Vendedores recebidos:', vendedores);
         
-        if (vendedorId) {
-            // Buscar porcentagem do vendedor
-            const vendedorResult = await client.query('SELECT porcentagem FROM vendedores WHERE id = $1', [vendedorId]);
-            const porcentagem = parseFloat(vendedorResult.rows[0]?.porcentagem || 0);
-            
-            const valorComissao = porcentagem > 0 ? (parseFloat(amount) * porcentagem) / 100 : 0;
-            const mesReferencia = new Date(paymentDate).toISOString().slice(0, 7);
-            
-            // Calcular valor do Rodrigo (resto)
-            const valorRodrigo = parseFloat(amount) - valorComissao;
-            
-            // Registrar comissão (sempre registra, mesmo que seja 0)
-            await client.query(`
-                INSERT INTO comissoes_vendedores (vendedor_id, cliente_id, valor_venda, valor_vendedor, mes_referencia, data_venda)
-                VALUES ($1, $2, $3, $4, $5, $6)
-            `, [vendedorId, clientId, parseFloat(amount), valorComissao, mesReferencia, paymentDate]);
+        // Salvar comissões dos vendedores
+        if (vendedores && vendedores.length > 0) {
+            for (const vendedor of vendedores) {
+                if (vendedor.vendedor_id && vendedor.porcentagem) {
+                    const valorComissao = (parseFloat(amount) * parseFloat(vendedor.porcentagem)) / 100;
+                    console.log(`Salvando comissão: Vendedor ${vendedor.vendedor_id}, ${vendedor.porcentagem}%, Valor: ${valorComissao}`);
+                    
+                    await db.query(`
+                        INSERT INTO payment_vendors (payment_id, vendedor_id, porcentagem, valor_comissao)
+                        VALUES ($1, $2, $3, $4)
+                    `, [paymentId, vendedor.vendedor_id, vendedor.porcentagem, valorComissao]);
+                }
+            }
         }
         
-        await client.query('COMMIT');
         res.status(201).json(newPayment.rows[0]);
     } catch (err) {
-        await client.query('ROLLBACK');
-        console.error(err.message);
-        res.status(500).json({ error: 'Erro ao adicionar pagamento.' });
-    } finally {
-        client.release();
+        console.error('Erro ao adicionar pagamento:', err.message);
+        res.status(500).json({ error: 'Erro ao adicionar pagamento: ' + err.message });
     }
 };
 
@@ -434,15 +470,40 @@ exports.getDashboardFinanceiro = async (req, res) => {
 
 
 
-// Reverter pagamento quando retirada é excluída
-exports.reverterPagamento = async (req, res) => {
+// Reverter comissões quando retirada é excluída
+exports.reverterRetirada = async (req, res) => {
     const { withdrawal_id } = req.body;
     try {
-        // Simplesmente retorna sucesso (sem lógica de reversão por enquanto)
-        res.json({ success: true, message: 'Reversão não implementada ainda.' });
+        // Buscar informações da retirada
+        const withdrawal = await db.query('SELECT * FROM withdrawals WHERE id = $1', [withdrawal_id]);
+        
+        if (withdrawal.rows.length === 0) {
+            return res.status(404).json({ error: 'Retirada não encontrada.' });
+        }
+        
+        const partnerId = withdrawal.rows[0].partner_id;
+        const withdrawalDate = withdrawal.rows[0].withdrawal_date;
+        
+        // Reverter comissões do vendedor para pendente
+        const mesReferencia = new Date(withdrawalDate).toISOString().slice(0, 7);
+        
+        await db.query(`
+            UPDATE payment_vendors 
+            SET status = 'pendente'
+            WHERE vendedor_id = $1 
+            AND payment_id IN (
+                SELECT p.id FROM payments p 
+                WHERE TO_CHAR(p.payment_date, 'YYYY-MM') = $2
+            )
+            AND status = 'pago'
+        `, [partnerId, mesReferencia]);
+        
+        console.log(`Comissões do vendedor ${partnerId} revertidas para pendente`);
+        
+        res.json({ success: true });
     } catch (err) {
-        console.error('Erro ao reverter pagamento:', err.message);
-        res.status(500).json({ error: 'Erro ao reverter pagamento: ' + err.message });
+        console.error('Erro ao reverter retirada:', err.message);
+        res.status(500).json({ error: 'Erro ao reverter retirada: ' + err.message });
     }
 };
 
@@ -512,6 +573,27 @@ exports.testeEstrutura = async (req, res) => {
     } catch (err) {
         console.error('Erro no teste:', err.message);
         res.status(500).json({ error: 'Erro no teste: ' + err.message });
+    }
+};
+
+// Busca vendedores de um pagamento específico
+exports.getPaymentVendors = async (req, res) => {
+    const { paymentId } = req.params;
+    try {
+        try {
+            const result = await db.query(`
+                SELECT vendedor_id, porcentagem
+                FROM payment_vendors
+                WHERE payment_id = $1
+            `, [paymentId]);
+            res.json(result.rows);
+        } catch (tableError) {
+            console.log('Tabela payment_vendors não existe');
+            res.json([]);
+        }
+    } catch (err) {
+        console.error(err.message);
+        res.status(500).json({ error: 'Erro ao buscar vendedores do pagamento.' });
     }
 };
 

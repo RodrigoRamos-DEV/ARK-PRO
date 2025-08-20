@@ -21,7 +21,7 @@ function AdminPartnersPage() {
     const [editingPayment, setEditingPayment] = useState(null);
     const [editingWithdrawal, setEditingWithdrawal] = useState(null);
     
-    const [paymentForm, setPaymentForm] = useState({ clientId: '', amount: '', paymentDate: '', notes: '' });
+    const [paymentForm, setPaymentForm] = useState({ clientId: '', amount: '', paymentDate: '', notes: '', vendedores: [] });
     const [withdrawalForm, setWithdrawalForm] = useState({ partnerId: '', amount: '', withdrawalDate: '' });
     const [dashboardData, setDashboardData] = useState({ totalCaixa: 0, lucroLiquido: 0, aPagarVendedores: 0, disponivelRetirada: 0 });
 
@@ -107,7 +107,8 @@ function AdminPartnersPage() {
             clientId: payment.client_id,
             amount: payment.amount,
             paymentDate: payment.payment_date.split('T')[0],
-            notes: payment.notes || ''
+            notes: payment.notes || '',
+            vendedores: [] // Para edição, começar vazio (pode implementar busca depois)
         });
         setShowPaymentModal(true);
     };
@@ -226,7 +227,7 @@ function AdminPartnersPage() {
     
     const handleOpenPaymentModal = () => {
         setEditingPayment(null);
-        setPaymentForm({ clientId: '', amount: '', paymentDate: new Date().toISOString().split('T')[0], notes: '' });
+        setPaymentForm({ clientId: '', amount: '', paymentDate: new Date().toISOString().split('T')[0], notes: '', vendedores: [] });
         setShowPaymentModal(true);
     };
     
@@ -559,7 +560,7 @@ function AdminPartnersPage() {
             {/* Modal Pagamento */}
             {showPaymentModal && (
                 <div style={{position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.7)', zIndex: 1000, display: 'flex', justifyContent: 'center', alignItems: 'center'}}>
-                    <div className="card" style={{width: '90%', maxWidth: '500px'}}>
+                    <div className="card" style={{width: '90%', maxWidth: '600px', maxHeight: '90vh', overflowY: 'auto'}}>
                         <h3>{editingPayment ? 'Editar Pagamento' : 'Novo Pagamento'}</h3>
                         <form onSubmit={handleSavePayment}>
                             <div className="input-group">
@@ -579,11 +580,95 @@ function AdminPartnersPage() {
                             </div>
                             <div className="input-group">
                                 <label>Observações</label>
-                                <textarea name="notes" value={paymentForm.notes} onChange={handlePaymentChange} rows="3"></textarea>
+                                <textarea name="notes" value={paymentForm.notes} onChange={handlePaymentChange} rows="2"></textarea>
                             </div>
-                            <div style={{display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '20px'}}>
-                                <button type="button" onClick={() => setShowPaymentModal(false)} className="btn" style={{backgroundColor: '#888'}}>Cancelar</button>
-                                <button type="submit" className="btn">Salvar</button>
+                            
+                            <div className="input-group" style={{backgroundColor: 'red', padding: '20px', margin: '20px 0'}}>
+                                <h2 style={{color: 'white', fontSize: '24px'}}>🚨 TESTE - VOCÊ VÊ ISSO? 🚨</h2>
+                                <p style={{color: 'white', fontSize: '18px'}}>Se você está vendo esta mensagem vermelha, as mudanças estão funcionando!</p>
+                            </div>
+                            
+                            {/* NOVA SEÇÃO DE VENDEDORES */}
+                            <div className="input-group" style={{marginTop: '20px'}}>
+                                <label style={{fontSize: '16px', fontWeight: 'bold', color: '#333'}}>🎯 Vendedores e Comissões</label>
+                                <div style={{border: '2px solid #007bff', borderRadius: '8px', padding: '15px', backgroundColor: '#f8f9ff'}}>
+                                    
+                                    {paymentForm.vendedores && paymentForm.vendedores.map((vendedor, index) => (
+                                        <div key={index} style={{display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '12px', padding: '10px', backgroundColor: 'white', borderRadius: '6px', border: '1px solid #ddd'}}>
+                                            <select 
+                                                value={vendedor.vendedor_id || ''} 
+                                                onChange={(e) => {
+                                                    const newVendedores = [...(paymentForm.vendedores || [])];
+                                                    newVendedores[index].vendedor_id = e.target.value;
+                                                    setPaymentForm({...paymentForm, vendedores: newVendedores});
+                                                }}
+                                                style={{flex: 2, padding: '8px', borderRadius: '4px', border: '1px solid #ccc'}}
+                                            >
+                                                <option value="">Selecione vendedor</option>
+                                                {partners.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                                            </select>
+                                            <input 
+                                                type="number" 
+                                                placeholder="%" 
+                                                value={vendedor.porcentagem || ''} 
+                                                onChange={(e) => {
+                                                    const newVendedores = [...(paymentForm.vendedores || [])];
+                                                    newVendedores[index].porcentagem = e.target.value;
+                                                    setPaymentForm({...paymentForm, vendedores: newVendedores});
+                                                }}
+                                                step="0.01" 
+                                                min="0" 
+                                                max="100"
+                                                style={{width: '70px', padding: '8px', borderRadius: '4px', border: '1px solid #ccc', textAlign: 'center'}}
+                                            />
+                                            <span style={{fontSize: '14px', color: '#666', fontWeight: 'bold'}}>%</span>
+                                            <button 
+                                                type="button" 
+                                                onClick={() => {
+                                                    const newVendedores = (paymentForm.vendedores || []).filter((_, i) => i !== index);
+                                                    setPaymentForm({...paymentForm, vendedores: newVendedores});
+                                                }}
+                                                style={{background: '#dc3545', color: 'white', border: 'none', borderRadius: '4px', padding: '6px 10px', cursor: 'pointer', fontSize: '14px'}}
+                                                title="Remover vendedor"
+                                            >
+                                                ✕
+                                            </button>
+                                        </div>
+                                    ))}
+                                    
+                                    <button 
+                                        type="button" 
+                                        onClick={() => {
+                                            const vendedoresAtuais = paymentForm.vendedores || [];
+                                            setPaymentForm({
+                                                ...paymentForm, 
+                                                vendedores: [...vendedoresAtuais, {vendedor_id: '', porcentagem: ''}]
+                                            });
+                                        }}
+                                        style={{background: '#28a745', color: 'white', border: 'none', borderRadius: '6px', padding: '10px 15px', cursor: 'pointer', fontSize: '14px', fontWeight: 'bold', width: '100%'}}
+                                    >
+                                        ➕ Adicionar Vendedor
+                                    </button>
+                                    
+                                    {paymentForm.vendedores && paymentForm.vendedores.length > 0 && (
+                                        <div style={{marginTop: '15px', padding: '10px', backgroundColor: '#e9ecef', borderRadius: '6px', fontSize: '13px'}}>
+                                            <div style={{fontWeight: 'bold', color: '#495057', marginBottom: '5px'}}>
+                                                📊 Total de comissões: {(paymentForm.vendedores || []).reduce((sum, v) => sum + parseFloat(v.porcentagem || 0), 0).toFixed(2)}%
+                                            </div>
+                                            {paymentForm.amount && (
+                                                <div style={{color: '#28a745', fontWeight: 'bold'}}>
+                                                    💰 Valor das comissões: {formatCurrency((paymentForm.vendedores || []).reduce((sum, v) => sum + (parseFloat(paymentForm.amount) * parseFloat(v.porcentagem || 0) / 100), 0))}
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                                <small style={{color: '#666', fontSize: '12px', fontStyle: 'italic'}}>💡 Adicione os vendedores que receberão comissão deste pagamento</small>
+                            </div>
+                            
+                            <div style={{display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '25px'}}>
+                                <button type="button" onClick={() => setShowPaymentModal(false)} className="btn" style={{backgroundColor: '#6c757d', padding: '10px 20px'}}>Cancelar</button>
+                                <button type="submit" className="btn" style={{backgroundColor: '#007bff', padding: '10px 20px'}}>💾 Salvar</button>
                             </div>
                         </form>
                     </div>

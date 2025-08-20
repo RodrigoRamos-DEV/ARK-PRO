@@ -26,9 +26,16 @@ exports.login = async (req, res) => {
         today.setHours(0, 0, 0, 0);
         const timeDiff = expiryDate.getTime() - today.getTime();
         const daysLeft = Math.ceil(timeDiff / (1000 * 3600 * 24));
+        
         let newStatus = 'Ativo';
-        if (daysLeft < 0) { newStatus = 'Vencido'; } 
-        else if (daysLeft <= 5) { newStatus = 'A Vencer'; }
+        if (user.license_status === 'Trial') {
+            if (daysLeft < 0) { newStatus = 'Trial Expirado'; }
+            else { newStatus = 'Trial'; }
+        } else {
+            if (daysLeft < 0) { newStatus = 'Vencido'; } 
+            else if (daysLeft <= 5) { newStatus = 'A Vencer'; }
+        }
+        
         if (newStatus !== user.license_status) {
             await db.query('UPDATE clients SET license_status = $1 WHERE id = $2', [newStatus, user.client_id]);
             user.license_status = newStatus;
@@ -55,6 +62,15 @@ exports.login = async (req, res) => {
         payload.user.companyName = user.company_name;
         payload.user.licenseExpiresAt = user.license_expires_at;
         payload.user.licenseStatus = user.license_status;
+        
+        // Calcular dias restantes para trial/licença
+        if (user.license_expires_at) {
+            const today = new Date();
+            const expiryDate = new Date(user.license_expires_at);
+            today.setHours(0, 0, 0, 0);
+            const timeDiff = expiryDate.getTime() - today.getTime();
+            payload.user.daysLeft = Math.ceil(timeDiff / (1000 * 3600 * 24));
+        }
     }
 
     jwt.sign(
@@ -77,8 +93,8 @@ exports.login = async (req, res) => {
 };
 
 exports.registerClient = async (req, res) => {
-    const { email, password, registrationToken } = req.body;
-    if (!email || !password || !registrationToken) {
+    const { email, password, companyName } = req.body;
+    if (!email || !password || !companyName) {
         return res.status(400).json({ msg: "Por favor, preencha todos os campos." });
     }
     
@@ -86,28 +102,45 @@ exports.registerClient = async (req, res) => {
     try {
         await client.query('BEGIN');
         
-        const tokenResult = await client.query( 'SELECT * FROM registration_tokens WHERE token_hash = $1 AND is_used = FALSE AND expires_at > NOW()', [registrationToken] );
-        if (tokenResult.rows.length === 0) { throw new Error("Token de registo inválido, expirado ou já utilizado."); }
+        // Verificar se email já existe
+        const existingUser = await client.query('SELECT 1 FROM users WHERE email = $1', [email]);
+        if (existingUser.rowCount > 0) {
+            throw new Error("Este email já está em uso.");
+        }
         
-        const tokenData = tokenResult.rows[0];
-        const { client_id, id: tokenId } = tokenData;
+        // Criar cliente com trial de 3 dias
+        const trialExpiry = new Date();
+        trialExpiry.setDate(trialExpiry.getDate() + 3);
         
-        const existingUser = await client.query('SELECT 1 FROM users WHERE client_id = $1', [client_id]);
-        if (existingUser.rowCount > 0) { throw new Error("Já existe um utilizador registado para este cliente."); }
+        const clientResult = await client.query(
+            'INSERT INTO clients (company_name, client_type, license_expires_at, license_status) VALUES ($1, $2, $3, $4) RETURNING id',
+            [companyName, 'produtor', trialExpiry, 'Trial']
+        );
         
+        const clientId = clientResult.rows[0].id;
+        
+        // Criar usuário
         const salt = await bcrypt.genSalt(10);
         const passwordHash = await bcrypt.hash(password, salt);
         
-        await client.query( 'INSERT INTO users (client_id, email, password_hash, role) VALUES ($1, $2, $3, $4)', [client_id, email, passwordHash, 'funcionario'] );
-        await client.query('UPDATE registration_tokens SET is_used = TRUE WHERE id = $1', [tokenId]);
+        await client.query(
+            'INSERT INTO users (client_id, email, password_hash, role) VALUES ($1, $2, $3, $4)',
+            [clientId, email, passwordHash, 'funcionario']
+        );
         
         await client.query('COMMIT');
         
-        res.status(201).json({ msg: "Utilizador registado com sucesso! Pode agora fazer o login." });
+        res.status(201).json({ 
+            msg: "Conta criada com sucesso! Você tem 3 dias de trial gratuito.",
+            trialDays: 3,
+            whatsapp: "+55 21 97304-4415" // SUBSTITUA PELO SEU NÚMERO REAL
+        });
     } catch (err) {
         await client.query('ROLLBACK');
         console.error(err.message);
-        if (err.code === '23505') { return res.status(400).json({ msg: 'Este email já está em uso.' }); }
+        if (err.code === '23505') { 
+            return res.status(400).json({ msg: 'Este email já está em uso.' }); 
+        }
         res.status(400).json({ msg: err.message || 'Erro no servidor.' });
     } finally {
         client.release();
