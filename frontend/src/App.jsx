@@ -25,6 +25,7 @@ import WhatsAppSupport from './components/WhatsAppSupport';
 import ClientTypeRouter from './components/ClientTypeRouter';
 import EmpresaDashboard from './components/EmpresaDashboard';
 import TestPaymentModal from './components/TestPaymentModal';
+import RedirectPage from './components/RedirectPage';
 
 function App() {
   const [theme, setTheme] = useState(localStorage.getItem('theme') || 'light');
@@ -56,7 +57,8 @@ function App() {
         />
 
         <Routes>
-          <Route path="/" element={<LoginPage />} />
+          <Route path="/" element={<RedirectPage />} />
+          <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/reset-password/:token" element={<ResetPasswordPage />} />
@@ -82,7 +84,7 @@ function App() {
           </Route>
 
           <Route path="/teste-pagamento" element={<TestPaymentModal />} />
-          <Route path="*" element={<Navigate to="/" />} />
+          <Route path="*" element={<Navigate to="/login" />} />
         </Routes>
       </Router>
       <WhatsAppSupport />
