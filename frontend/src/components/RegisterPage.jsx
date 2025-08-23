@@ -28,7 +28,7 @@ function RegisterPage() {
                     autoClose: 8000
                 });
             }
-            navigate('/'); // Redireciona para o login após o sucesso
+            navigate('/login'); // Redireciona para o login após o sucesso
         } catch (error) {
             toast.error(error.response?.data?.msg || 'Erro ao efetuar o registo.');
             setIsLoading(false);
@@ -60,7 +60,7 @@ function RegisterPage() {
                         {isLoading ? 'Criando conta...' : 'Começar Trial Gratuito'}
                     </button>
                 </form>
-                <p style={{ marginTop: '20px' }}>Já tem uma conta? <Link to="/">Faça o login</Link></p>
+                <p style={{ marginTop: '20px' }}>Já tem uma conta? <Link to="/login">Faça o login</Link></p>
             </div>
         </div>
     );
